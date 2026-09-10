@@ -4,7 +4,7 @@ decrement to avoid circular imports."""
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from deps import db, _oid, serialize, sl
 from auth import make_current_user_dep

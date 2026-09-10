@@ -1,11 +1,10 @@
 """Kegs router — 35+ tap tracker with volume + low-level alerts + prep-view aggregation."""
 from datetime import datetime, timezone
-from typing import Optional, Literal, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from deps import db, _oid, serialize, sl
+from deps import db, _oid, serialize
 from auth import make_current_user_dep
 
 get_current_user = make_current_user_dep(lambda: db)

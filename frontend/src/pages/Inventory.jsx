@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { PackagePlus, Trash2, AlertTriangle, Plus } from "lucide-react";
@@ -43,6 +43,7 @@ export default function Inventory() {
   };
 
   const lowCount = ings.filter((i) => i.low).length;
+  const buyTotal = useMemo(() => buy.reduce((a, b) => a + b.est_cost, 0), [buy]);
 
   return (
     <div data-testid="inventory-management-panel">
@@ -173,7 +174,7 @@ export default function Inventory() {
             {buy.length > 0 && (
               <div className="p-3 flex justify-between font-mono font-bold" data-testid="buy-total">
                 <span>Total order</span>
-                <span className="text-[var(--amber)]">HK${buy.reduce((a, b) => a + b.est_cost, 0).toFixed(2)}</span>
+                <span className="text-[var(--amber)]">HK${buyTotal.toFixed(2)}</span>
               </div>
             )}
             {buy.length === 0 && <div className="p-8 text-center text-[var(--emerald)] text-sm">Stock healthy — nothing to order.</div>}

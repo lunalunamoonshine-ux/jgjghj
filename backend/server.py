@@ -7,13 +7,11 @@ load_dotenv(ROOT_DIR / ".env")
 import os
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 from zoneinfo import ZoneInfo
 
-from bson import ObjectId
-
 HK_TZ = ZoneInfo("Asia/Hong_Kong")
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, Response, Request
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, Response
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.cors import CORSMiddleware
 

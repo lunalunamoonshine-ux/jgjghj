@@ -20,8 +20,10 @@ export default function MobileMenu() {
     try {
       const r = await fetch(`${BACKEND_URL}/api/public/bill/${tableId}`);
       if (r.ok) setBill(await r.json());
-    } catch {}
-  }, [tableId]);
+    } catch (err) {
+      console.warn("[bill] fetch failed (offline?)", err);
+    }
+  }, [tableId, BACKEND_URL]);
   useEffect(() => { loadBill(); const t = setInterval(loadBill, 10000); return () => clearInterval(t); }, [loadBill]);
 
   const requestFpsPay = async () => {
@@ -226,8 +228,8 @@ export default function MobileMenu() {
         <div className="mt-6 rounded-xl border border-[var(--cyan)]/40 bg-[var(--surface)] p-4" data-testid="guest-bill-panel">
           <div className="font-mono text-xs uppercase tracking-widest text-[var(--cyan)] font-bold mb-3">Your bill so far</div>
           <div className="space-y-1 mb-3">
-            {bill.lines.map((l, i) => (
-              <div key={i} className="flex justify-between text-sm">
+            {bill.lines.map((l) => (
+              <div key={`${l.name}-${l.qty}-${l.price}`} className="flex justify-between text-sm">
                 <span>{l.qty}× {l.name}</span>
                 <span className="font-mono">{fmtHKD(l.price * l.qty)}</span>
               </div>

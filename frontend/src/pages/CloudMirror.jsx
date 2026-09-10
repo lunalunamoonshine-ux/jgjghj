@@ -83,8 +83,8 @@ export default function CloudMirror() {
               </div>
               <div className="space-y-1.5 text-sm max-h-40 overflow-y-auto">
                 {(latest.alerts || []).length === 0 && <div className="text-[var(--muted)]">All quiet.</div>}
-                {(latest.alerts || []).map((a, i) => (
-                  <div key={i} className="flex items-start gap-2">
+                {(latest.alerts || []).map((a) => (
+                  <div key={`${a.ts}-${a.message}`} className="flex items-start gap-2">
                     {a.kind === "stock" ? <Ban size={12} className="mt-1 text-[var(--amber)] shrink-0" /> : <BellRing size={12} className="mt-1 text-[var(--rose)] shrink-0" />}
                     <span className="text-xs">{a.message}</span>
                   </div>
@@ -126,8 +126,8 @@ export default function CloudMirror() {
 
       <h2 className="font-display font-bold text-xl mb-3">Sync History</h2>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
-        {(report?.history || []).map((h, i) => (
-          <div key={i} className="p-3 flex justify-between text-sm font-mono">
+        {(report?.history || []).map((h) => (
+          <div key={h.ts} className="p-3 flex justify-between text-sm font-mono">
             <span className="text-[var(--muted)]">{new Date(h.ts).toLocaleString()}</span>
             <span className="text-[var(--cyan)] font-bold">{fmtHKD(h.sales?.total_revenue)}</span>
           </div>

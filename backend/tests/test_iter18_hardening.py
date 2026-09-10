@@ -12,10 +12,12 @@ load_dotenv(Path("/app/frontend/.env"))
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 assert BASE_URL, "REACT_APP_BACKEND_URL missing"
 CLOUD_URL = os.environ.get("CLOUD_MIRROR_URL", "http://localhost:8002").rstrip("/")
-CLOUD_KEY = os.environ.get("CLOUD_API_KEY", "hkpos-mirror-key-7f3a9c2e")
-ADMIN_EMAIL = "lunalunamoonshine@gmail.com"
-ADMIN_PASSWORD = "admin123"
-ADMIN_PIN = "9999"
+CLOUD_KEY = os.environ.get("CLOUD_API_KEY", "")
+assert CLOUD_KEY, "CLOUD_API_KEY missing from backend/.env"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+ADMIN_PIN = os.environ.get("ADMIN_PIN", "")
+assert ADMIN_EMAIL and ADMIN_PASSWORD and ADMIN_PIN, "ADMIN_* creds missing from backend/.env"
 
 
 # --- Fixtures ---

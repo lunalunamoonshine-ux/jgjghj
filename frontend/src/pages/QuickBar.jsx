@@ -24,7 +24,7 @@ export default function QuickBar() {
     loadHH();
     const t = setInterval(loadHH, 60000);
     return () => clearInterval(t);
-  }, []);
+  }, [api]);
 
   const hhFor = (p) => {
     if (!p.happy_hour_eligible) return 0;

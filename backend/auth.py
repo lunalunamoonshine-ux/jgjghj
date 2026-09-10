@@ -1,12 +1,11 @@
 """Auth utilities: password hashing, JWT tokens, current user dep."""
 import os
 from datetime import datetime, timezone, timedelta
-from typing import Optional
 
 import bcrypt
 import jwt
 from bson import ObjectId
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request
 
 JWT_ALGO = "HS256"
 

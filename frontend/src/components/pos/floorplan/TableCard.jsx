@@ -34,7 +34,12 @@ export default function TableCard({ table: t, hint, editMode, onDown, onResizeDo
   const saveStyle = async (body) => {
     onStyleChange(t.id, body);
     setPalette(false);
-    try { await api.patch(`/tables/${t.id}`, body); } catch { /* keep optimistic */ }
+    try {
+      await api.patch(`/tables/${t.id}`, body);
+    } catch (err) {
+      // Optimistic UI already applied; keep it but surface the failure.
+      console.warn(`[table] style save failed for ${t.name}:`, err?.response?.status || err.message);
+    }
   };
 
   return (

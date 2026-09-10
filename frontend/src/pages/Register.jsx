@@ -59,14 +59,14 @@ export default function Register() {
     });
     api.get("/products").then((r) => setProducts(r.data));
     api.get("/combos").then((r) => setCombos(r.data));
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     const loadHH = () => api.get("/happy-hours/active").then((r) => setActiveHH(r.data.active || []));
     loadHH();
     const t = setInterval(loadHH, 60000);
     return () => clearInterval(t);
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     if (orderId) {

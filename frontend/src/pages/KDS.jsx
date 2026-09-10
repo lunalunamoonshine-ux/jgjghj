@@ -209,7 +209,7 @@ export default function KDS() {
                   {new Date(o.opened_at).toLocaleTimeString("en-HK", { timeZone: "Asia/Hong_Kong", hour12: false })}
                 </div>
                 <div className="text-sm mb-2">
-                  {o.lines.map((l, i) => <div key={i}>{l.qty}× {l.name}</div>)}
+                  {o.lines.map((l) => <div key={`${l.name}-${l.qty}`}>{l.qty}× {l.name}</div>)}
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-mono font-bold text-[var(--amber)]">HK${o.total?.toFixed(2)}</span>

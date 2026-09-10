@@ -10,13 +10,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     (async () => {
       try {
-        const t = localStorage.getItem("hkbar_token");
-        if (!t) return setLoading(false);
+        // Session lives in the httpOnly cookie; just ask the server who we are.
         const { data } = await api.get("/auth/me");
         setUser(data);
       } catch (err) {
-        console.error("[auth/me] refresh failed, clearing token:", err);
-        localStorage.removeItem("hkbar_token");
+        console.warn("[auth/me] no active session:", err?.response?.status || err.message);
       } finally {
         setLoading(false);
       }
@@ -25,14 +23,12 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
-    localStorage.setItem("hkbar_token", data.token);
     setUser(data.user);
     return data.user;
   }, []);
 
   const pinLogin = useCallback(async (pin) => {
     const { data } = await api.post("/auth/pin-login", { pin });
-    localStorage.setItem("hkbar_token", data.token);
     setUser(data.user);
     return data.user;
   }, []);
@@ -44,7 +40,6 @@ export function AuthProvider({ children }) {
       // Non-blocking — server may be offline; we still clear local state below.
       console.warn("[auth/logout] server call failed:", err);
     }
-    localStorage.removeItem("hkbar_token");
     setUser(null);
   }, []);
 

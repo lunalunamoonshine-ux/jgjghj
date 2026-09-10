@@ -10,11 +10,16 @@ export default function Tournaments() {
   const { user } = useAuth();
   const mgr = ["admin", "manager"].includes(user?.role);
 
+  const selId = sel?.id;
   const load = useCallback(async () => {
     setList((await api.get("/tournaments")).data);
-    if (sel) setSel((await api.get(`/tournaments/${sel.id}`)).data);
-  }, [sel?.id]);
-  useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, []);
+    if (selId) setSel((await api.get(`/tournaments/${selId}`)).data);
+  }, [selId]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, [load]);
 
   const create = async () => {
     const name = prompt("Tournament name", "Wednesday Darts 501"); if (!name) return;
