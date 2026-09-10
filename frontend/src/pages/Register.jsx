@@ -218,13 +218,25 @@ export default function Register() {
   };
 
   const removeLine = (i) => {
-    const doRemove = () => setOrder((o) => ({ ...o, lines: o.lines.filter((_, idx) => idx !== i) }));
-    const isManager = user?.role === "admin" || user?.role === "manager";
-    if (order?.id && !isManager) {
-      setPinGate({ action: `void "${order.lines[i]?.name}"`, onOk: doRemove });
+    const line = order.lines[i];
+    // Saved order -> audited void with reason code (+ wastage if already fired)
+    if (order?.id) {
+      const doVoid = async (mgrPin) => {
+        const reason = prompt("Void reason: wrong order / spillage / on the house / returned / other", "wrong order") || "other";
+        try {
+          await api.post(`/orders/${order.id}/void-line`, { line_index: i, reason, manager_pin: mgrPin });
+          toast.success(`Voided: ${line?.name} (${reason})${line?.held ? "" : " — wastage logged"}`);
+          const upd = await api.get(`/orders/${order.id}`);
+          setOrder(upd.data);
+        } catch (e) { toast.error(errMsg(e, "Void failed")); }
+      };
+      const isManager = user?.role === "admin" || user?.role === "manager";
+      if (isManager) { doVoid(undefined); return; }
+      setPinGate({ action: `void "${line?.name}"`, onOk: (mgr, pin) => doVoid(pin) });
       return;
     }
-    doRemove();
+    // Unsaved draft -> plain local remove
+    setOrder((o) => ({ ...o, lines: o.lines.filter((_, idx) => idx !== i) }));
   };
 
   const repeatRound = () => {
@@ -355,7 +367,7 @@ export default function Register() {
 
       {pinGate && (
         <ManagerPin action={pinGate.action}
-          onSuccess={() => { pinGate.onOk(); setPinGate(null); }}
+          onSuccess={(mgr, pin) => { pinGate.onOk(mgr, pin); setPinGate(null); }}
           onClose={() => setPinGate(null)} />
       )}
     </div>

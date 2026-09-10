@@ -16,7 +16,7 @@ export default function ManagerPin({ action = "authorize", onSuccess, onClose, r
     try {
       const r = await api.post("/auth/pin-verify", { pin: val, required_roles: requiredRoles });
       toast.success(`Approved by ${r.data.name}`);
-      onSuccess(r.data);
+      onSuccess(r.data, val);
     } catch (e) {
       toast.error(e?.response?.data?.detail || "PIN rejected");
       setPin("");

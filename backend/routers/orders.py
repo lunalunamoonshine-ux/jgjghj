@@ -21,7 +21,7 @@ from auth import make_current_user_dep
 from models import OrderIn, OrderUpdate, PaymentIn, AutoCloseIn, MoveLineIn, MergeOrdersIn, PreauthTabIn, DeliveryIngestIn, SetupIntentIn, PreauthCompleteIn, UpsellNudgeIn
 from routers.kegs import decrement_kegs_for_order
 from routers.printers import route_ticket_lines, print_receipt
-from routers.inventory import deduct_ingredients_for_order
+from routers.inventory import deduct_ingredients_for_order, waste_line_ingredients
 
 HK_TZ = ZoneInfo("Asia/Hong_Kong")
 
@@ -782,3 +782,77 @@ async def upsell_leaderboard(window_hours: int = 168, user: dict = Depends(get_c
         out.append(r)
     out.sort(key=lambda r: (-r["accepted"], -r["revenue_lifted"]))
     return out
+
+
+# ===================== VOIDS (manager-gated, reason-coded) =====================
+@router.post("/orders/{oid}/void-line")
+async def void_line(oid: str, body: dict, user: dict = Depends(get_current_user)):
+    """Void a line with a reason code. Manager PIN required unless caller is a manager.
+    Fired (made) items also feed ingredient wastage tracking automatically."""
+    o = await db.orders.find_one({"_id": _oid(oid)})
+    if not o or o.get("status") == "paid":
+        raise HTTPException(400, "Cannot void on this order")
+    manager = user
+    if user["role"] not in ("admin", "manager"):
+        mgr = await db.users.find_one({"pin": body.get("manager_pin", ""), "role": {"$in": ["admin", "manager"]}, "active": True})
+        if not mgr:
+            raise HTTPException(403, "Manager PIN required")
+        manager = {"id": str(mgr["_id"]), "name": mgr["name"], "role": mgr["role"]}
+    idx = body.get("line_index")
+    lines = o.get("lines", [])
+    if idx is None or idx < 0 or idx >= len(lines):
+        raise HTTPException(404, "Line not found")
+    line = lines.pop(idx)
+    reason = body.get("reason", "void")
+    combos = await _active_combos()
+    totals = _compute_totals(lines, o.get("discount_type", "none"), o.get("discount_value", 0),
+                             o.get("service_charge_pct", 10), combos)
+    await db.orders.update_one({"_id": o["_id"]}, {"$set": {"lines": lines, **totals}})
+    was_fired = not line.get("held")
+    if was_fired:
+        try:
+            await waste_line_ingredients(line, manager["name"], reason)
+        except Exception:
+            pass
+    await db.voids.insert_one({
+        "order_id": oid, "line": line, "reason": reason, "was_fired": was_fired,
+        "approved_by": manager["name"], "requested_by": user["name"],
+        "ts": datetime.now(timezone.utc).isoformat(),
+    })
+    return serialize(await db.orders.find_one({"_id": o["_id"]}))
+
+
+@router.get("/voids")
+async def list_voids(limit: int = 100, user: dict = Depends(get_current_user)):
+    return sl(await db.voids.find().sort("ts", -1).to_list(limit))
+
+
+# ===================== QR SELF-ORDER CONFIRM =====================
+@router.get("/qr/pending")
+async def pending_qr_orders(user: dict = Depends(get_current_user)):
+    return sl(await db.orders.find({"status": "pending_confirm"}).sort("opened_at", 1).to_list(50))
+
+
+@router.post("/orders/{oid}/confirm")
+async def confirm_qr_order(oid: str, user: dict = Depends(get_current_user)):
+    """Staff confirms a guest QR order -> live open order + tickets to printers."""
+    o = await db.orders.find_one({"_id": _oid(oid)})
+    if not o:
+        raise HTTPException(404, "Not found")
+    if o.get("status") != "pending_confirm":
+        raise HTTPException(400, "Order is not pending confirmation")
+    lines = o.get("lines", [])
+    for l in lines:
+        l["held"] = False
+        l["fired_at"] = datetime.now(timezone.utc).isoformat()
+    await db.orders.update_one({"_id": o["_id"]},
+        {"$set": {"status": "open", "lines": lines, "confirmed_by": user["name"],
+                  "confirmed_at": datetime.now(timezone.utc).isoformat()}})
+    if o.get("table_id"):
+        await db.tables.update_one({"_id": _oid(o["table_id"])},
+            {"$set": {"status": "occupied", "current_order_id": oid}})
+    try:
+        await route_ticket_lines(o, lines, user)
+    except Exception:
+        pass
+    return serialize(await db.orders.find_one({"_id": o["_id"]}))

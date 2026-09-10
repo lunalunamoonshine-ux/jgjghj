@@ -44,7 +44,18 @@ async def build_payload() -> dict:
     usage: dict = {}
     for r in usage_rows:
         usage[r["name"]] = round(usage.get(r["name"], 0) - r["delta"], 3)
-    return {
+    # Pre-shift briefing + owner alerts (read-only aggregates)
+    eightysixed = [p["name"] async for p in db.products.find({"eightysix": True})]
+    active_hh = []
+    try:
+        from datetime import datetime as _dt
+        today = _dt.now(timezone.utc).strftime("%Y-%m-%d")
+        async for e in db.events.find({"date": today}):
+            active_hh.append(e.get("name", "event"))
+    except Exception:
+        pass
+    unacked = await db.alerts.find({"ack": False}).sort("ts", -1).to_list(20)
+    payload = {
         "venue_id": "hk-bar-001",
         "ts": _now(),
         "sales": {
@@ -56,7 +67,10 @@ async def build_payload() -> dict:
         "inventory": [{"name": i["name"], "qty": i["qty"], "unit": i["unit"], "par_level": i.get("par_level", 0)} for i in ingredients],
         "low_stock": [i["name"] for i in low],
         "usage": [{"name": k, "qty": v} for k, v in usage.items()],
+        "briefing": {"low_stock": [i["name"] for i in low], "eightysixed": eightysixed, "events_today": active_hh},
+        "alerts": [{"kind": a.get("kind"), "message": a.get("message"), "ts": a.get("ts")} for a in unacked],
     }
+    return payload
 
 
 async def push_to_cloud() -> dict:

@@ -9,6 +9,7 @@ export default function Shift() {
   const { user } = useAuth();
   const [current, setCurrent] = useState({ open: false });
   const [history, setHistory] = useState([]);
+  const [walk, setWalk] = useState(null); // end-of-night wastage walkthrough
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -26,7 +27,14 @@ export default function Shift() {
   const clockOut = async () => {
     if (!confirm("Clock out and close shift?")) return;
     setBusy(true);
-    try { await api.post("/shifts/clock-out"); toast.success("Clocked out — Z report ready"); await load(); }
+    try {
+      await api.post("/shifts/clock-out");
+      toast.success("Clocked out — Z report ready");
+      await load();
+      // End-of-night ritual: wastage walkthrough keeps counts trustworthy
+      const ings = await api.get("/ingredients");
+      setWalk(ings.data.sort((a, b) => (b.low ? 1 : 0) - (a.low ? 1 : 0)));
+    }
     catch (e) { toast.error("Failed"); }
     finally { setBusy(false); }
   };
@@ -88,6 +96,45 @@ export default function Shift() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {walk && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" data-testid="walkthrough-modal">
+          <div className="bg-[var(--surface)] border border-[var(--amber)]/40 rounded-xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto">
+            <div className="font-mono text-xs uppercase tracking-widest text-[var(--amber)] font-bold mb-1">End-of-night ritual</div>
+            <div className="font-display font-black text-xl mb-1">Wastage Walkthrough</div>
+            <p className="text-xs text-[var(--muted)] mb-4">Log tonight's spillage/breakage before you leave — unlogged wastage makes counts drift and alerts untrusted. Low-stock items are listed first.</p>
+            <div className="space-y-2">
+              {walk.map((i) => (
+                <div key={i.id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]" data-testid={`walk-row-${i.id}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{i.name} {i.low && <span className="text-[var(--rose)] text-[10px] font-mono font-bold">LOW</span>}</div>
+                    <div className="text-[10px] font-mono text-[var(--muted)]">on hand {i.qty}{i.unit}</div>
+                  </div>
+                  <input data-testid={`walk-qty-${i.id}`} type="number" placeholder="qty" min="0" step="any"
+                    className="w-20 px-2 py-1.5 rounded bg-[var(--bg)] border border-[var(--border)] font-mono text-sm"
+                    id={`walk-in-${i.id}`} />
+                  <button data-testid={`walk-log-${i.id}`}
+                    onClick={async () => {
+                      const el = document.getElementById(`walk-in-${i.id}`);
+                      const qty = parseFloat(el.value);
+                      if (!qty || qty <= 0) return toast.error("Enter qty");
+                      await api.post(`/ingredients/${i.id}/wastage`, { qty, reason: "end-of-night walkthrough" });
+                      el.value = "";
+                      toast.success(`Logged ${qty}${i.unit} wastage: ${i.name}`);
+                      const r = await api.get("/ingredients");
+                      setWalk(r.data.sort((a, b) => (b.low ? 1 : 0) - (a.low ? 1 : 0)));
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-[var(--rose)]/15 text-[var(--rose)] text-xs font-bold shrink-0">Log</button>
+                </div>
+              ))}
+            </div>
+            <button data-testid="walk-skip" onClick={() => setWalk(null)}
+              className="mt-4 w-full py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-sm">
+              Done — nothing wasted tonight
+            </button>
+          </div>
         </div>
       )}
 

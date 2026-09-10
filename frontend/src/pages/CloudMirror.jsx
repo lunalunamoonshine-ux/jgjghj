@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, fmtHKD } from "@/lib/api";
 import { toast } from "sonner";
-import { Cloud, RefreshCw, ShieldCheck } from "lucide-react";
+import { Cloud, RefreshCw, ShieldCheck, BellRing, CalendarClock, Ban } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function CloudMirror() {
   const [status, setStatus] = useState(null);
@@ -60,6 +61,57 @@ export default function CloudMirror() {
             <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="text-[10px] font-mono uppercase tracking-widest text-[var(--muted)] mb-1">Low Stock</div><div className="font-display font-black text-2xl text-[var(--rose)]" data-testid="mirror-low-stock">{(latest.low_stock || []).length}</div></div>
             <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="text-[10px] font-mono uppercase tracking-widest text-[var(--muted)] mb-1">Snapshot</div><div className="font-mono text-xs text-[var(--muted)]">{new Date(latest.ts).toLocaleString()}</div></div>
           </div>
+
+          {/* Pre-shift briefing + owner alerts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-xl border border-[var(--amber)]/40 bg-[var(--amber)]/5 p-4" data-testid="briefing-card">
+              <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[var(--amber)] font-bold mb-3">
+                <CalendarClock size={14} /> Pre-shift Briefing
+              </div>
+              <div className="space-y-2 text-sm">
+                <div><span className="text-[var(--muted)]">Low stock:</span>{" "}
+                  {latest.briefing?.low_stock?.length ? latest.briefing.low_stock.join(", ") : <span className="text-[var(--emerald)]">none</span>}</div>
+                <div><span className="text-[var(--muted)]">86'd items:</span>{" "}
+                  {latest.briefing?.eightysixed?.length ? latest.briefing.eightysixed.join(", ") : <span className="text-[var(--emerald)]">none</span>}</div>
+                <div><span className="text-[var(--muted)]">Events today:</span>{" "}
+                  {latest.briefing?.events_today?.length ? latest.briefing.events_today.join(", ") : "none scheduled"}</div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-[var(--rose)]/40 bg-[var(--rose)]/5 p-4" data-testid="owner-alerts-card">
+              <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[var(--rose)] font-bold mb-3">
+                <BellRing size={14} /> Owner Alerts ({(latest.alerts || []).length})
+              </div>
+              <div className="space-y-1.5 text-sm max-h-40 overflow-y-auto">
+                {(latest.alerts || []).length === 0 && <div className="text-[var(--muted)]">All quiet.</div>}
+                {(latest.alerts || []).map((a, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    {a.kind === "stock" ? <Ban size={12} className="mt-1 text-[var(--amber)] shrink-0" /> : <BellRing size={12} className="mt-1 text-[var(--rose)] shrink-0" />}
+                    <span className="text-xs">{a.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Revenue trend across snapshots */}
+      {(report?.history || []).length > 1 && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 mb-6" data-testid="trend-chart-card">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--muted)] mb-2">Revenue Trend (per snapshot)</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={[...report.history].reverse().map((h) => ({ t: new Date(h.ts).toLocaleTimeString("en-HK", { hour12: false }), revenue: h.sales?.total_revenue || 0 }))}>
+              <XAxis dataKey="t" stroke="#687087" fontSize={10} />
+              <YAxis stroke="#687087" fontSize={10} />
+              <Tooltip contentStyle={{ background: "#1A1D2B", border: "1px solid #282C3F" }} />
+              <Line type="monotone" dataKey="revenue" stroke="#00F2FE" strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {latest && (
+        <>
           <h2 className="font-display font-bold text-xl mb-3">Inventory Snapshot</h2>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] mb-6">
             {(latest.inventory || []).map((i) => (

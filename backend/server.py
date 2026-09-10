@@ -625,6 +625,47 @@ async def public_menu(table_id: str):
     }
 
 
+@api.post("/public/order/{table_id}")
+async def public_order(table_id: str, body: dict):
+    """Guest QR self-order from the table. Server-side pricing only; the order lands
+    as pending_confirm until staff approves it (KDS), then tickets print."""
+    try:
+        t = await db.tables.find_one({"_id": _oid(table_id)})
+    except Exception:
+        raise HTTPException(404, "Table not found")
+    if not t:
+        raise HTTPException(404, "Table not found")
+    lines = []
+    for item in body.get("lines", []):
+        try:
+            p = await db.products.find_one({"_id": _oid(item.get("product_id", ""))})
+        except Exception:
+            continue
+        if not p or p.get("eightysix") or not p.get("active", True):
+            continue
+        qty = max(1, int(item.get("qty", 1)))
+        lines.append({
+            "product_id": str(p["_id"]), "name": p["name"], "price": p["price"],
+            "qty": qty, "variant": None, "modifiers": [], "course": p.get("course", "drink"),
+            "held": False, "notes": item.get("notes", ""),
+        })
+    if not lines:
+        raise HTTPException(400, "No valid items")
+    subtotal = round(sum(l["price"] * l["qty"] for l in lines), 2)
+    service = round(subtotal * 0.10, 2)
+    doc = {
+        "order_type": "dine_in", "table_id": table_id, "area_id": t.get("area_id"),
+        "guests": 1, "lines": lines, "discount_type": "none", "discount_value": 0,
+        "service_charge_pct": 10, "notes": "QR self-order", "source": "qr",
+        "subtotal": subtotal, "discount": 0, "service_charge": service,
+        "total": round(subtotal + service, 2),
+        "status": "pending_confirm", "server_id": None,
+        "opened_at": datetime.now(timezone.utc).isoformat(), "closed_at": None,
+    }
+    r = await db.orders.insert_one(doc)
+    return {"order_id": str(r.inserted_id), "total": doc["total"], "status": "pending_confirm"}
+
+
 # ===================== WAITLIST =====================
 @api.get("/waitlist")
 async def list_waitlist(user: dict = Depends(get_current_user)):

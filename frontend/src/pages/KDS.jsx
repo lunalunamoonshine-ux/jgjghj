@@ -27,10 +27,13 @@ export default function KDS() {
   const [station, setStation] = useState("all");
   const [tab, setTab] = useState("board"); // board | prep
   const [tickets, setTickets] = useState([]);
+  const [pendingQr, setPendingQr] = useState([]);
   const [prep, setPrep] = useState([]);
   const [, setTick] = useState(0);
 
   const load = useCallback(async () => {
+    const qr = await api.get("/qr/pending");
+    setPendingQr(qr.data);
     if (tab === "prep") {
       const r = await api.get("/kds/prep");
       setPrep(r.data);
@@ -158,6 +161,40 @@ export default function KDS() {
         <StatCard label="Drinks" value={stats.drink} color="#A855F7" testid="kds-drink" />
         <StatCard label=">10m Late" value={stats.over10} color="#F43F5E" testid="kds-late" />
       </div>
+
+      {pendingQr.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--cyan)]/50 bg-[var(--cyan)]/5 p-4" data-testid="qr-pending-panel">
+          <div className="font-mono text-xs uppercase tracking-widest text-[var(--cyan)] font-bold mb-2">
+            QR Orders Awaiting Confirm ({pendingQr.length})
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {pendingQr.map((o) => (
+              <div key={o.id} data-testid={`pending-qr-${o.id}`} className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+                <div className="text-xs font-mono text-[var(--muted)] mb-1">
+                  {new Date(o.opened_at).toLocaleTimeString("en-HK", { timeZone: "Asia/Hong_Kong", hour12: false })}
+                </div>
+                <div className="text-sm mb-2">
+                  {o.lines.map((l, i) => <div key={i}>{l.qty}× {l.name}</div>)}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-[var(--amber)]">HK${o.total?.toFixed(2)}</span>
+                  <button data-testid={`confirm-qr-${o.id}`}
+                    onClick={async () => {
+                      try {
+                        await api.post(`/orders/${o.id}/confirm`);
+                        toast.success("Confirmed — tickets sent to printers");
+                        load();
+                      } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+                    }}
+                    className="btn-neon px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1">
+                    <Check size={12} /> Confirm & Fire
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {tickets.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-14 text-center">

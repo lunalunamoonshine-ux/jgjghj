@@ -10,6 +10,34 @@ export default function MobileMenu() {
   const [data, setData] = useState(null);
   const [q, setQ] = useState("");
   const [activeCat, setActiveCat] = useState(null);
+  const [cart, setCart] = useState({});
+  const [placed, setPlaced] = useState(null);
+  const [placing, setPlacing] = useState(false);
+
+  const add = (p) => setCart((c) => ({ ...c, [p.id]: { p, qty: (c[p.id]?.qty || 0) + 1 } }));
+  const dec = (p) => setCart((c) => {
+    const qty = (c[p.id]?.qty || 0) - 1;
+    const n = { ...c };
+    if (qty <= 0) delete n[p.id]; else n[p.id] = { p, qty };
+    return n;
+  });
+  const cartItems = Object.values(cart);
+  const cartTotal = cartItems.reduce((a, { p, qty }) => a + p.price * qty, 0);
+
+  const placeOrder = async () => {
+    setPlacing(true);
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/public/order/${tableId}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: cartItems.map(({ p, qty }) => ({ product_id: p.id, qty })) }),
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || "Order failed");
+      setPlaced(await r.json());
+      setCart({});
+    } catch (e) {
+      alert(e.message);
+    } finally { setPlacing(false); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -27,6 +55,19 @@ export default function MobileMenu() {
 
   if (!data) return <FullScreenSpinner />;
   if (data.error) return <div className="min-h-screen flex items-center justify-center text-[var(--muted)]">{data.error}</div>;
+
+  if (placed) return (
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex items-center justify-center p-6" data-testid="order-placed-screen">
+      <div className="text-center max-w-sm">
+        <div className="w-16 h-16 mx-auto rounded-full bg-[var(--emerald)]/15 text-[var(--emerald)] flex items-center justify-center font-display font-black text-2xl mb-4">✓</div>
+        <div className="font-display font-black text-2xl mb-2">Order sent to the bar</div>
+        <div className="text-sm text-[var(--muted)] mb-1">Order #{placed.order_id.slice(0, 6)} · {fmtHKD(placed.total)}</div>
+        <div className="text-xs text-[var(--muted)] mb-6">Our team will confirm and fire it to the kitchen/bar. Pay at the table when you're ready.</div>
+        <button data-testid="order-more-btn" onClick={() => setPlaced(null)}
+          className="px-6 py-3 rounded-lg bg-[var(--cyan)] text-black font-bold">Order more</button>
+      </div>
+    </div>
+  );
 
   const activeHhIds = new Set();
   (data.active_hh || []).forEach(h => (h.category_ids || []).forEach(id => activeHhIds.add(id)));
@@ -121,7 +162,7 @@ export default function MobileMenu() {
                       </div>
                     )}
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                     {hh ? (
                       <>
                         <div className="font-mono font-black text-[var(--amber)]">{fmtHKD(price)}</div>
@@ -131,6 +172,17 @@ export default function MobileMenu() {
                     ) : (
                       <div className="font-mono font-black text-[var(--amber)]">{fmtHKD(p.price)}</div>
                     )}
+                    <div className="flex items-center gap-1.5">
+                      {cart[p.id] && (
+                        <>
+                          <button data-testid={`m-dec-${p.name}`} onClick={() => dec(p)}
+                            className="w-7 h-7 rounded-md bg-[var(--surface-2)] border border-[var(--border)] font-mono font-bold">−</button>
+                          <span className="font-mono font-bold text-sm w-5 text-center" data-testid={`m-qty-${p.name}`}>{cart[p.id].qty}</span>
+                        </>
+                      )}
+                      <button data-testid={`m-add-${p.name}`} onClick={() => add(p)}
+                        className="w-7 h-7 rounded-md bg-[var(--cyan)] text-black font-mono font-black">+</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -141,11 +193,27 @@ export default function MobileMenu() {
           )}
         </div>
 
-        <div className="mt-8 pt-6 border-t border-[var(--border)] text-center text-[10px] font-mono text-[var(--muted)]">
-          Please order at the bar or ask your server.
+        <div className="mt-8 pt-6 border-t border-[var(--border)] text-center text-[10px] font-mono text-[var(--muted)] pb-24">
+          Orders go straight to our team for confirmation.
           <br />10% service charge applies to all orders.
         </div>
       </div>
+
+      {/* Cart bar */}
+      {cartItems.length > 0 && (
+        <div className="fixed bottom-0 inset-x-0 z-30 p-4" data-testid="qr-cart-bar">
+          <div className="max-w-md mx-auto rounded-xl bg-[var(--surface-2)] border border-[var(--cyan)]/50 shadow-2xl p-3 flex items-center gap-3">
+            <div className="flex-1">
+              <div className="font-mono font-bold text-sm" data-testid="qr-cart-count">{cartItems.reduce((a, i) => a + i.qty, 0)} item(s)</div>
+              <div className="font-mono text-xs text-[var(--muted)]">{fmtHKD(cartTotal)} + 10% svc</div>
+            </div>
+            <button data-testid="qr-place-order" onClick={placeOrder} disabled={placing}
+              className="px-5 py-3 rounded-lg bg-[var(--cyan)] text-black font-display font-black disabled:opacity-40">
+              {placing ? "Sending…" : "Place Order"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
