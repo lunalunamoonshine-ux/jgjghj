@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutGrid, Utensils, Users, Shield, LineChart, PartyPopper, LogOut, Sparkles, Flame, Clock, ClipboardList, Beer, Zap, Truck, Trophy, Printer, Boxes, Cloud,
+  LayoutGrid, Utensils, Users, Shield, LineChart, PartyPopper, LogOut, Sparkles, Flame, Clock, ClipboardList, Beer, Zap, Truck, Trophy, Printer, Boxes, Cloud, Target, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
@@ -15,6 +15,8 @@ const NAV = [
   { to: "/inventory", label: "Stock", icon: Boxes, testid: "nav-inventory" },
   { to: "/printers", label: "Print", icon: Printer, testid: "nav-printers" },
   { to: "/cloud", label: "Cloud", icon: Cloud, testid: "nav-cloud" },
+  { to: "/tournaments", label: "Darts", icon: Target, testid: "nav-tournaments" },
+  { to: "/audit", label: "Audit", icon: ShieldCheck, testid: "nav-audit" },
   { to: "/waitlist", label: "Wait", icon: ClipboardList, testid: "nav-waitlist" },
   { to: "/menu", label: "Menu", icon: Utensils, testid: "nav-menu" },
   { to: "/crm", label: "Members", icon: Users, testid: "nav-crm" },

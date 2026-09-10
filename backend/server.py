@@ -33,6 +33,8 @@ from routers.orders import router as orders_router
 from routers.printers import router as printers_router
 from routers.inventory import router as inventory_router
 from routers.mirror import router as mirror_router, sync_loop
+from routers.audit import router as audit_router
+from routers.tournaments import router as tournaments_router
 
 # ----- DB -----
 mongo_url = os.environ["MONGO_URL"]
@@ -666,6 +668,40 @@ async def public_order(table_id: str, body: dict):
     return {"order_id": str(r.inserted_id), "total": doc["total"], "status": "pending_confirm"}
 
 
+@api.get("/public/bill/{table_id}")
+async def public_bill(table_id: str):
+    """Guest views the live bill for their table (QR pay-at-seat)."""
+    try:
+        o = await db.orders.find_one({"table_id": table_id, "status": {"$in": ["open", "pending_confirm"]}})
+    except Exception:
+        raise HTTPException(404, "No bill")
+    if not o:
+        raise HTTPException(404, "No open bill for this table")
+    pr = await db.payment_requests.find_one({"order_id": str(o["_id"]), "status": "pending"})
+    return {"order_id": str(o["_id"]), "status": o["status"],
+            "lines": [{"name": l["name"], "qty": l["qty"], "price": l["price"]} for l in o.get("lines", [])],
+            "subtotal": o.get("subtotal", 0), "service_charge": o.get("service_charge", 0),
+            "total": o.get("total", 0),
+            "payment_pending": bool(pr), "payment_method": pr.get("method") if pr else None}
+
+
+@api.post("/public/pay-request")
+async def public_pay_request(body: dict):
+    """Guest taps 'I've paid by FPS' -> staff must confirm before the order settles."""
+    o = await db.orders.find_one({"_id": _oid(body.get("order_id", ""))})
+    if not o or o.get("status") != "open":
+        raise HTTPException(400, "No open bill")
+    existing = await db.payment_requests.find_one({"order_id": str(o["_id"]), "status": "pending"})
+    if existing:
+        return {"ok": True, "already": True}
+    await db.payment_requests.insert_one({
+        "order_id": str(o["_id"]), "method": body.get("method", "fps"),
+        "amount": o.get("total", 0), "status": "pending",
+        "ts": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True}
+
+
 # ===================== WAITLIST =====================
 @api.get("/waitlist")
 async def list_waitlist(user: dict = Depends(get_current_user)):
@@ -757,6 +793,8 @@ app.include_router(orders_router)    # split: orders + exclusivity totals engine
 app.include_router(printers_router)  # ESC/POS LAN printer routing + print jobs + alerts
 app.include_router(inventory_router) # ingredient inventory + BOM deduction
 app.include_router(mirror_router)    # read-only cloud reporting mirror sync
+app.include_router(audit_router)     # immutable SHA-256 audit chain
+app.include_router(tournaments_router) # darts tournament ledger
 
 app.add_middleware(
     CORSMiddleware,

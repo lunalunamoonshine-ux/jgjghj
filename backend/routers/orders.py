@@ -22,6 +22,7 @@ from models import OrderIn, OrderUpdate, PaymentIn, AutoCloseIn, MoveLineIn, Mer
 from routers.kegs import decrement_kegs_for_order
 from routers.printers import route_ticket_lines, print_receipt
 from routers.inventory import deduct_ingredients_for_order, waste_line_ingredients
+from routers.audit import audit_event
 
 HK_TZ = ZoneInfo("Asia/Hong_Kong")
 
@@ -293,6 +294,8 @@ async def pay_order(oid: str, body: PaymentIn, user: dict = Depends(get_current_
         {"$set": {"status": "paid", "payment": payment,
                   "closed_at": datetime.now(timezone.utc).isoformat()}},
     )
+    await audit_event("payment", {"order_id": oid, "total": o["total"],
+                      "method": payment["method"], "tip": payment.get("tip", 0)}, user["name"])
     if o.get("table_id"):
         await db.tables.update_one(
             {"_id": _oid(o["table_id"])},
@@ -819,6 +822,10 @@ async def void_line(oid: str, body: dict, user: dict = Depends(get_current_user)
         "approved_by": manager["name"], "requested_by": user["name"],
         "ts": datetime.now(timezone.utc).isoformat(),
     })
+    await audit_event("void", {"order_id": oid, "item": line.get("name"), "qty": line.get("qty"),
+                      "amount": round(line.get("price", 0) * line.get("qty", 1), 2),
+                      "reason": reason, "was_fired": was_fired,
+                      "approved_by": manager["name"]}, user["name"])
     return serialize(await db.orders.find_one({"_id": o["_id"]}))
 
 
@@ -856,3 +863,58 @@ async def confirm_qr_order(oid: str, user: dict = Depends(get_current_user)):
     except Exception:
         pass
     return serialize(await db.orders.find_one({"_id": o["_id"]}))
+
+
+# ===================== GUEST PAY-AT-SEAT CONFIRMS =====================
+@router.get("/payments/pending")
+async def pending_payments(user: dict = Depends(get_current_user)):
+    reqs = sl(await db.payment_requests.find({"status": "pending"}).sort("ts", 1).to_list(50))
+    for r in reqs:
+        o = await db.orders.find_one({"_id": _oid(r["order_id"])})
+        if o and o.get("table_id"):
+            t = await db.tables.find_one({"_id": _oid(o["table_id"])})
+            r["table"] = t["name"] if t else "?"
+        r["lines"] = [{"name": l["name"], "qty": l["qty"], "price": l["price"]} for l in (o or {}).get("lines", [])]
+    return reqs
+
+
+@router.post("/payments/{prid}/confirm")
+async def confirm_guest_payment(prid: str, user: dict = Depends(get_current_user)):
+    """Staff confirms the guest's FPS/wallet transfer arrived -> settle through the
+    same path as register payment (stock, receipt, audit)."""
+    pr = await db.payment_requests.find_one({"_id": _oid(prid)})
+    if not pr or pr["status"] != "pending":
+        raise HTTPException(404, "Payment request not found")
+    o = await db.orders.find_one({"_id": _oid(pr["order_id"])})
+    if not o or o.get("status") == "paid":
+        raise HTTPException(400, "Order not payable")
+    payment = {"method": pr["method"], "amount": pr["amount"], "tip": 0.0, "splits": [],
+               "change": 0.0, "paid_at": datetime.now(timezone.utc).isoformat(),
+               "cashier_id": user["id"], "channel": "qr_guest"}
+    await db.orders.update_one({"_id": o["_id"]},
+        {"$set": {"status": "paid", "payment": payment, "closed_at": datetime.now(timezone.utc).isoformat()}})
+    await db.payment_requests.update_one({"_id": pr["_id"]},
+        {"$set": {"status": "confirmed", "confirmed_by": user["name"],
+                  "confirmed_at": datetime.now(timezone.utc).isoformat()}})
+    if o.get("table_id"):
+        await db.tables.update_one({"_id": _oid(o["table_id"])},
+            {"$set": {"status": "dirty", "current_order_id": None}})
+    try:
+        await decrement_kegs_for_order(o)
+        await deduct_ingredients_for_order(o, user.get("name", "system"))
+        await print_receipt(o, payment, user)
+    except Exception:
+        pass
+    await audit_event("payment", {"order_id": pr["order_id"], "total": o.get("total", 0),
+                      "method": pr["method"], "channel": "qr_guest"}, user["name"])
+    return serialize(await db.orders.find_one({"_id": o["_id"]}))
+
+
+@router.post("/payments/{prid}/reject")
+async def reject_guest_payment(prid: str, user: dict = Depends(get_current_user)):
+    pr = await db.payment_requests.find_one({"_id": _oid(prid)})
+    if not pr or pr["status"] != "pending":
+        raise HTTPException(404, "Payment request not found")
+    await db.payment_requests.update_one({"_id": pr["_id"]},
+        {"$set": {"status": "rejected", "confirmed_by": user["name"]}})
+    return {"ok": True}

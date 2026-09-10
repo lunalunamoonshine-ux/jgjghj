@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { api, fmtHKD } from "@/lib/api";
 import { Sparkles, Search, MapPin } from "lucide-react";
@@ -13,6 +13,28 @@ export default function MobileMenu() {
   const [cart, setCart] = useState({});
   const [placed, setPlaced] = useState(null);
   const [placing, setPlacing] = useState(false);
+  const [bill, setBill] = useState(null);
+  const [paidReq, setPaidReq] = useState(false);
+
+  const loadBill = useCallback(async () => {
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/public/bill/${tableId}`);
+      if (r.ok) setBill(await r.json());
+    } catch {}
+  }, [tableId]);
+  useEffect(() => { loadBill(); const t = setInterval(loadBill, 10000); return () => clearInterval(t); }, [loadBill]);
+
+  const requestFpsPay = async () => {
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/public/pay-request`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: bill.order_id, method: "fps" }),
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || "Failed");
+      setPaidReq(true);
+      loadBill();
+    } catch (e) { alert(e.message); }
+  };
 
   const add = (p) => setCart((c) => ({ ...c, [p.id]: { p, qty: (c[p.id]?.qty || 0) + 1 } }));
   const dec = (p) => setCart((c) => {
@@ -198,6 +220,36 @@ export default function MobileMenu() {
           <br />10% service charge applies to all orders.
         </div>
       </div>
+
+      {/* Live bill + FPS pay-at-seat */}
+      {bill && bill.status === "open" && (
+        <div className="mt-6 rounded-xl border border-[var(--cyan)]/40 bg-[var(--surface)] p-4" data-testid="guest-bill-panel">
+          <div className="font-mono text-xs uppercase tracking-widest text-[var(--cyan)] font-bold mb-3">Your bill so far</div>
+          <div className="space-y-1 mb-3">
+            {bill.lines.map((l, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span>{l.qty}× {l.name}</span>
+                <span className="font-mono">{fmtHKD(l.price * l.qty)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-[var(--border)] pt-2 space-y-1 font-mono text-sm">
+            <div className="flex justify-between text-[var(--muted)]"><span>Subtotal</span><span>{fmtHKD(bill.subtotal)}</span></div>
+            <div className="flex justify-between text-[var(--muted)]"><span>Service 10%</span><span>{fmtHKD(bill.service_charge)}</span></div>
+            <div className="flex justify-between font-black text-lg text-[var(--amber)]"><span>Total</span><span data-testid="guest-bill-total">{fmtHKD(bill.total)}</span></div>
+          </div>
+          {bill.payment_pending || paidReq ? (
+            <div className="mt-3 py-3 rounded-lg bg-[var(--emerald)]/10 border border-[var(--emerald)]/40 text-center text-sm font-semibold text-[var(--emerald)]" data-testid="fps-pending-note">
+              FPS payment sent — staff will confirm shortly
+            </div>
+          ) : (
+            <button data-testid="fps-pay-btn" onClick={requestFpsPay}
+              className="mt-3 w-full py-3.5 rounded-lg bg-[#00A8FF] text-black font-display font-black">
+              Pay {fmtHKD(bill.total)} with FPS 轉數快
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Cart bar */}
       {cartItems.length > 0 && (

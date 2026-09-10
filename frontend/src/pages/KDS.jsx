@@ -28,12 +28,14 @@ export default function KDS() {
   const [tab, setTab] = useState("board"); // board | prep
   const [tickets, setTickets] = useState([]);
   const [pendingQr, setPendingQr] = useState([]);
+  const [pendingPays, setPendingPays] = useState([]);
   const [prep, setPrep] = useState([]);
   const [, setTick] = useState(0);
 
   const load = useCallback(async () => {
-    const qr = await api.get("/qr/pending");
+    const [qr, pays] = await Promise.all([api.get("/qr/pending"), api.get("/payments/pending")]);
     setPendingQr(qr.data);
+    setPendingPays(pays.data);
     if (tab === "prep") {
       const r = await api.get("/kds/prep");
       setPrep(r.data);
@@ -161,6 +163,39 @@ export default function KDS() {
         <StatCard label="Drinks" value={stats.drink} color="#A855F7" testid="kds-drink" />
         <StatCard label=">10m Late" value={stats.over10} color="#F43F5E" testid="kds-late" />
       </div>
+
+      {pendingPays.length > 0 && (
+        <div className="mb-4 rounded-xl border border-[var(--emerald)]/50 bg-[var(--emerald)]/5 p-4" data-testid="guest-payments-panel">
+          <div className="font-mono text-xs uppercase tracking-widest text-[var(--emerald)] font-bold mb-2">
+            Guest Payments to Confirm ({pendingPays.length})
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {pendingPays.map((p) => (
+              <div key={p.id} data-testid={`pending-pay-${p.id}`} className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+                <div className="text-sm font-semibold">{p.table} · <span className="font-mono text-[#00A8FF] uppercase">{p.method}</span></div>
+                <div className="text-xs text-[var(--muted)] mb-2">{(p.lines || []).map((l) => `${l.qty}×${l.name}`).join(", ")}</div>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-[var(--amber)]">HK${p.amount?.toFixed(2)}</span>
+                  <div className="flex gap-1.5">
+                    <button data-testid={`confirm-pay-${p.id}`}
+                      onClick={async () => {
+                        try {
+                          await api.post(`/payments/${p.id}/confirm`);
+                          toast.success(`Settled HK${p.amount?.toFixed(2)} — receipt printed, stock deducted`);
+                          load();
+                        } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+                      }}
+                      className="btn-neon px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1"><Check size={12} /> Received</button>
+                    <button data-testid={`reject-pay-${p.id}`}
+                      onClick={async () => { await api.post(`/payments/${p.id}/reject`); toast("Marked not received"); load(); }}
+                      className="px-3 py-2 rounded-lg bg-[var(--rose)]/15 text-[var(--rose)] text-xs font-bold">Not recv'd</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {pendingQr.length > 0 && (
         <div className="mb-4 rounded-xl border border-[var(--cyan)]/50 bg-[var(--cyan)]/5 p-4" data-testid="qr-pending-panel">

@@ -22,6 +22,8 @@ import UpsellLog from "@/pages/UpsellLog";
 import Printers from "@/pages/Printers";
 import Inventory from "@/pages/Inventory";
 import CloudMirror from "@/pages/CloudMirror";
+import Tournaments from "@/pages/Tournaments";
+import Audit from "@/pages/Audit";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -63,6 +65,8 @@ export default function App() {
           <Route path="/printers" element={<Protected><Printers /></Protected>} />
           <Route path="/inventory" element={<Protected><Inventory /></Protected>} />
           <Route path="/cloud" element={<Protected><CloudMirror /></Protected>} />
+          <Route path="/tournaments" element={<Protected><Tournaments /></Protected>} />
+          <Route path="/audit" element={<Protected><Audit /></Protected>} />
           <Route path="*" element={<Navigate to="/floorplan" replace />} />
         </Routes>
       </BrowserRouter>
