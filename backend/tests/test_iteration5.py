@@ -20,7 +20,7 @@ def _login(email, password):
 
 @pytest.fixture(scope="session")
 def admin_h():
-    return {"Authorization": f"Bearer {_login('polymuze111@gmail.com', 'admin123')}"}
+    return {"Authorization": f"Bearer {_login('lunalunamoonshine@gmail.com', 'admin123')}"}
 
 
 # ---------- _compute_totals defensive discount init ----------

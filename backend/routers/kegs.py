@@ -161,6 +161,24 @@ async def prep_bump_all(product_id: str, user: dict = Depends(get_current_user))
     return {"bumped": bumped}
 
 
+def _acc_prep_line(prep: dict, l: dict, tname: str, prods: dict):
+    """Fold one fired line into the per-product prep accumulator."""
+    key = l.get("product_id") or l["name"]
+    if key not in prep:
+        p = prods.get(l.get("product_id") or "")
+        prep[key] = {
+            "product_id": l.get("product_id"),
+            "name": (p or {}).get("name") or l["name"],
+            "kind": (p or {}).get("kind") or ("drink" if l.get("course") == "drink" else "food"),
+            "course": l.get("course"),
+            "total": 0,
+            "tables": {},
+        }
+    qty = l.get("qty") or 1
+    prep[key]["total"] += qty
+    prep[key]["tables"][tname] = prep[key]["tables"].get(tname, 0) + qty
+
+
 # ---------- Prep view (consolidated kitchen batch) ----------
 @router.get("/kds/prep")
 async def prep_view(user: dict = Depends(get_current_user)):
@@ -175,24 +193,10 @@ async def prep_view(user: dict = Depends(get_current_user)):
         for l in o.get("lines", []):
             if l.get("held") or not l.get("fired_at") or l.get("bumped_at"):
                 continue
-            key = l.get("product_id") or l["name"]
-            if key not in prep:
-                p = prods.get(l.get("product_id") or "")
-                prep[key] = {
-                    "product_id": l.get("product_id"),
-                    "name": (p or {}).get("name") or l["name"],
-                    "kind": (p or {}).get("kind") or ("drink" if l.get("course") == "drink" else "food"),
-                    "course": l.get("course"),
-                    "total": 0,
-                    "tables": {},
-                }
-            prep[key]["total"] += l.get("qty") or 1
-            prep[key]["tables"][tname] = prep[key]["tables"].get(tname, 0) + (l.get("qty") or 1)
-    out = []
-    for v in prep.values():
-        out.append({
-            **v,
-            "tables": [{"name": k, "qty": q} for k, q in sorted(v["tables"].items(), key=lambda x: -x[1])],
-        })
+            _acc_prep_line(prep, l, tname, prods)
+    out = [
+        {**v, "tables": [{"name": k, "qty": q} for k, q in sorted(v["tables"].items(), key=lambda x: -x[1])]}
+        for v in prep.values()
+    ]
     out.sort(key=lambda x: -x["total"])
     return out

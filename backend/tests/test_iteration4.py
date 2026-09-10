@@ -15,7 +15,7 @@ def _login(email, password):
 
 @pytest.fixture(scope="session")
 def admin_h():
-    return {"Authorization": f"Bearer {_login('polymuze111@gmail.com', 'admin123')}"}
+    return {"Authorization": f"Bearer {_login('lunalunamoonshine@gmail.com', 'admin123')}"}
 
 
 # ---------- Public menu ----------
@@ -35,8 +35,8 @@ class TestPublicMenu:
         # No _id in serialized docs
         for p in data["products"]:
             assert "_id" not in p
-            assert p.get("active", True) is True
-            assert p.get("eightysix", False) is False
+            assert p.get("active", True) == True
+            assert p.get("eightysix", False) == False
 
     def test_public_menu_404(self):
         r = requests.get(f"{BASE_URL}/api/public/menu/507f1f77bcf86cd799439011")
@@ -65,7 +65,7 @@ class TestPinVerify:
                           json={"pin": "1111", "required_roles": ["manager", "admin"]})
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["valid"] is True
+        assert d["valid"] == True
         assert d["role"] == "manager"
         assert d["name"]
         assert isinstance(d["user_id"], str)

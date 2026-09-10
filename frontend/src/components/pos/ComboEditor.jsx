@@ -38,39 +38,13 @@ export function ComboEditor({ combo, products, onClose, onSave }) {
           <button onClick={onClose} className="text-[var(--muted)]"><X size={20} /></button>
         </div>
 
-        <div className="grid grid-cols-[1fr_140px_140px] gap-3 mb-4">
-          <Field label="Combo name">
-            <input data-testid="combo-name" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Beer + Wings Combo" className={inp} />
-          </Field>
-          <Field label="Discount">
-            <select value={type} onChange={(e) => setType(e.target.value)} className={inp}>
-              <option value="percent">Percent %</option>
-              <option value="cash">Cash HKD</option>
-            </select>
-          </Field>
-          <Field label={type === "percent" ? "% off" : "HKD off"}>
-            <input data-testid="combo-value" type="number" step="0.01" value={value}
-              onChange={(e) => setValue(parseFloat(e.target.value) || 0)} className={inp} />
-          </Field>
-        </div>
-
-        <div className="flex items-center gap-2 mb-4">
-          <button data-testid="combo-active" onClick={() => setActive(!active)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase border ${
-              active ? "bg-[var(--emerald)]/20 border-[var(--emerald)] text-[var(--emerald)]"
-                     : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"
-            }`}>
-            {active ? "Active" : "Paused"}
-          </button>
-          <button data-testid="combo-schedule-toggle" onClick={() => setSchedEnabled(!schedEnabled)}
-            className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase border flex items-center gap-1 ${
-              schedEnabled ? "bg-[var(--amber)]/20 border-[var(--amber)] text-[var(--amber)]"
-                           : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"
-            }`}>
-            <Clock size={12} /> {schedEnabled ? "Scheduled" : "Always-on"}
-          </button>
-        </div>
+        <ComboBasics
+          name={name} setName={setName}
+          type={type} setType={setType}
+          value={value} setValue={setValue}
+          active={active} setActive={setActive}
+          schedEnabled={schedEnabled} setSchedEnabled={setSchedEnabled}
+        />
 
         {schedEnabled && (
           <ComboScheduleFields
@@ -113,6 +87,46 @@ export function ComboEditor({ combo, products, onClose, onSave }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ComboBasics({ name, setName, type, setType, value, setValue, active, setActive, schedEnabled, setSchedEnabled }) {
+  return (
+    <>
+      <div className="grid grid-cols-[1fr_140px_140px] gap-3 mb-4">
+        <Field label="Combo name">
+          <input data-testid="combo-name" value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Beer + Wings Combo" className={inp} />
+        </Field>
+        <Field label="Discount">
+          <select value={type} onChange={(e) => setType(e.target.value)} className={inp}>
+            <option value="percent">Percent %</option>
+            <option value="cash">Cash HKD</option>
+          </select>
+        </Field>
+        <Field label={type === "percent" ? "% off" : "HKD off"}>
+          <input data-testid="combo-value" type="number" step="0.01" value={value}
+            onChange={(e) => setValue(parseFloat(e.target.value) || 0)} className={inp} />
+        </Field>
+      </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        <button data-testid="combo-active" onClick={() => setActive(!active)}
+          className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase border ${
+            active ? "bg-[var(--emerald)]/20 border-[var(--emerald)] text-[var(--emerald)]"
+                   : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"
+          }`}>
+          {active ? "Active" : "Paused"}
+        </button>
+        <button data-testid="combo-schedule-toggle" onClick={() => setSchedEnabled(!schedEnabled)}
+          className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase border flex items-center gap-1 ${
+            schedEnabled ? "bg-[var(--amber)]/20 border-[var(--amber)] text-[var(--amber)]"
+                         : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"
+          }`}>
+          <Clock size={12} /> {schedEnabled ? "Scheduled" : "Always-on"}
+        </button>
+      </div>
+    </>
   );
 }
 

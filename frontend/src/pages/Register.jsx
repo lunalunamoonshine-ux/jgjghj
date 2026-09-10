@@ -82,7 +82,7 @@ export default function Register() {
         status: "draft",
       });
     }
-  }, [orderId, tableId, areaId]);
+  }, [orderId, tableId, areaId, api]);
 
   // ---- Totals (frontend mirrors backend exclusivity rule) ----
   const totals = useMemo(() => {

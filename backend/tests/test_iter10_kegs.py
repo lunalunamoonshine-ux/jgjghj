@@ -6,7 +6,7 @@ import requests
 
 BASE = (os.environ.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
 API = f"{BASE}/api"
-CREDS = {"email": "polymuze111@gmail.com", "password": "admin123"}
+CREDS = {"email": "lunalunamoonshine@gmail.com", "password": "admin123"}
 
 
 @pytest.fixture(scope="module")
@@ -32,11 +32,14 @@ def test_kegs_list_seeded(s):
               "threshold_pct", "status", "pct_remaining", "alert"]:
         assert f in keg, f"missing field {f} in keg {keg}"
     assert "product" in keg
-    # first keg = Tap 01 · Tsingtao at ~8%
+    # Tap 01 · Tsingtao — assert pct math + alert logic (state-independent;
+    # repeated runs drain the keg, so a hardcoded ~8% is not idempotent)
     tap01 = next((k for k in kegs if k["name"].startswith("Tap 01")), None)
     assert tap01 is not None
-    assert 6 <= tap01["pct_remaining"] <= 10, f"pct_remaining={tap01['pct_remaining']}"
-    assert tap01["alert"] is True
+    expected_pct = round(tap01["current_ml"] / tap01["size_ml"] * 100, 1) if tap01["size_ml"] else 0.0
+    assert tap01["pct_remaining"] == pytest.approx(expected_pct, abs=0.2), \
+        f"pct_remaining={tap01['pct_remaining']} expected {expected_pct}"
+    assert tap01["alert"] == (tap01["pct_remaining"] <= tap01["threshold_pct"] and tap01["status"] == "on")
 
 
 # -------- Keg CRUD --------

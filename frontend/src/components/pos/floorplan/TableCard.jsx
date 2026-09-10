@@ -29,19 +29,6 @@ export function tableStyle(t) {
  * Extracted from Floorplan.jsx during the component-split sprint.
  */
 export default function TableCard({ table: t, hint, editMode, onDown, onResizeDown, openTable, delTable, onStyleChange }) {
-  const [palette, setPalette] = useState(false);
-
-  const saveStyle = async (body) => {
-    onStyleChange(t.id, body);
-    setPalette(false);
-    try {
-      await api.patch(`/tables/${t.id}`, body);
-    } catch (err) {
-      // Optimistic UI already applied; keep it but surface the failure.
-      console.warn(`[table] style save failed for ${t.name}:`, err?.response?.status || err.message);
-    }
-  };
-
   return (
     <div
       key={t.id}
@@ -81,85 +68,105 @@ export default function TableCard({ table: t, hint, editMode, onDown, onResizeDo
         </div>
       )}
       {editMode && (
-        <>
-        <button
-          data-testid={`btn-del-${t.name}`}
-          onClick={(e) => { e.stopPropagation(); delTable(t.id); }}
-          className="absolute -top-2 -right-2 w-6 h-6 bg-[var(--rose)] text-white rounded-full flex items-center justify-center"
-        >
-          <Trash2 size={12} />
-        </button>
-        {/* resize handle — pull to adjust size/dimensions */}
-        <div
-          data-testid={`resize-${t.name}`}
-          onMouseDown={(e) => { e.stopPropagation(); onResizeDown(e, t); }}
-          onClick={(e) => e.stopPropagation()}
-          title="Drag to resize"
-          className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-[var(--amber)] text-black flex items-center justify-center cursor-nwse-resize shadow-lg border-2 border-[var(--surface)]"
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M9 1L1 9M9 5L5 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-        </div>
-        {/* shape toggle */}
-        <button
-          data-testid={`shape-${t.name}`}
-          onClick={async (e) => {
-            e.stopPropagation();
-            const shape = t.shape === "circle" ? "rect" : "circle";
-            const body = { shape };
-            if (shape === "circle") body.height = t.width; // round tables stay square-ish
-            onStyleChange(t.id, body);
-            await api.patch(`/tables/${t.id}`, body).catch(() => {});
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          title="Toggle round / square"
-          className="absolute -bottom-2 -left-2 w-6 h-6 rounded-full bg-[var(--surface-2)] border border-[var(--border)] text-[10px] flex items-center justify-center"
-        >
-          {t.shape === "circle" ? "◯" : "▢"}
-        </button>
-        {/* color picker toggle */}
-        <button
-          data-testid={`color-${t.name}`}
-          onClick={(e) => { e.stopPropagation(); setPalette((p) => !p); }}
-          onMouseDown={(e) => e.stopPropagation()}
-          title="Table color"
-          className="absolute -top-2 -left-2 w-6 h-6 rounded-full border-2 border-[var(--surface)] shadow-lg"
-          style={{ background: t.color || "var(--surface-2)" }}
-        />
-        {palette && (
-          <div
-            data-testid={`palette-${t.name}`}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="absolute top-full left-0 mt-2 z-50 p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] shadow-2xl w-44"
-          >
-            <div className="grid grid-cols-4 gap-1.5 mb-2">
-              {TABLE_COLORS.map((c) => (
-                <button key={c} data-testid={`palette-color-${c.replace("#", "")}`}
-                  onClick={() => saveStyle({ color: c, color_mode: t.color_mode || "border" })}
-                  className={`w-8 h-8 rounded-md border-2 ${t.color === c ? "border-white" : "border-transparent"}`}
-                  style={{ background: c }} />
-              ))}
-            </div>
-            <div className="flex gap-1">
-              {COLOR_MODES.map(([m, label]) => (
-                <button key={m} data-testid={`palette-mode-${m}`}
-                  onClick={() => t.color && saveStyle({ color: t.color, color_mode: m })}
-                  className={`flex-1 py-1 rounded-md text-[9px] font-mono font-bold uppercase ${
-                    (t.color_mode || "border") === m ? "bg-[var(--cyan)] text-black" : "bg-[var(--surface)] text-[var(--muted)]"}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <button data-testid={`palette-clear-${t.name}`} onClick={() => saveStyle({ clear_color: true })}
-              className="mt-1.5 w-full py-1 rounded-md text-[9px] font-mono uppercase text-[var(--rose)] bg-[var(--rose)]/10">
-              Clear color
-            </button>
-          </div>
-        )}
-        </>
+        <TableEditControls t={t} onResizeDown={onResizeDown} delTable={delTable} onStyleChange={onStyleChange} />
       )}
     </div>
+  );
+}
+
+/** Edit-mode chrome: delete, resize handle, shape toggle, color picker + palette. */
+function TableEditControls({ t, onResizeDown, delTable, onStyleChange }) {
+  const [palette, setPalette] = useState(false);
+
+  const saveStyle = async (body) => {
+    onStyleChange(t.id, body);
+    setPalette(false);
+    try {
+      await api.patch(`/tables/${t.id}`, body);
+    } catch (err) {
+      // Optimistic UI already applied; keep it but surface the failure.
+      console.warn(`[table] style save failed for ${t.name}:`, err?.response?.status || err.message);
+    }
+  };
+
+  return (
+    <>
+      <button
+        data-testid={`btn-del-${t.name}`}
+        onClick={(e) => { e.stopPropagation(); delTable(t.id); }}
+        className="absolute -top-2 -right-2 w-6 h-6 bg-[var(--rose)] text-white rounded-full flex items-center justify-center"
+      >
+        <Trash2 size={12} />
+      </button>
+      {/* resize handle — pull to adjust size/dimensions */}
+      <div
+        data-testid={`resize-${t.name}`}
+        onMouseDown={(e) => { e.stopPropagation(); onResizeDown(e, t); }}
+        onClick={(e) => e.stopPropagation()}
+        title="Drag to resize"
+        className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-[var(--amber)] text-black flex items-center justify-center cursor-nwse-resize shadow-lg border-2 border-[var(--surface)]"
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M9 1L1 9M9 5L5 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </div>
+      {/* shape toggle */}
+      <button
+        data-testid={`shape-${t.name}`}
+        onClick={async (e) => {
+          e.stopPropagation();
+          const shape = t.shape === "circle" ? "rect" : "circle";
+          const body = { shape };
+          if (shape === "circle") body.height = t.width; // round tables stay square-ish
+          onStyleChange(t.id, body);
+          await api.patch(`/tables/${t.id}`, body).catch((err) => console.warn("[table] shape save failed:", err));
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        title="Toggle round / square"
+        className="absolute -bottom-2 -left-2 w-6 h-6 rounded-full bg-[var(--surface-2)] border border-[var(--border)] text-[10px] flex items-center justify-center"
+      >
+        {t.shape === "circle" ? "◯" : "▢"}
+      </button>
+      {/* color picker toggle */}
+      <button
+        data-testid={`color-${t.name}`}
+        onClick={(e) => { e.stopPropagation(); setPalette((p) => !p); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        title="Table color"
+        className="absolute -top-2 -left-2 w-6 h-6 rounded-full border-2 border-[var(--surface)] shadow-lg"
+        style={{ background: t.color || "var(--surface-2)" }}
+      />
+      {palette && (
+        <div
+          data-testid={`palette-${t.name}`}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute top-full left-0 mt-2 z-50 p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] shadow-2xl w-44"
+        >
+          <div className="grid grid-cols-4 gap-1.5 mb-2">
+            {TABLE_COLORS.map((c) => (
+              <button key={c} data-testid={`palette-color-${c.replace("#", "")}`}
+                onClick={() => saveStyle({ color: c, color_mode: t.color_mode || "border" })}
+                className={`w-8 h-8 rounded-md border-2 ${t.color === c ? "border-white" : "border-transparent"}`}
+                style={{ background: c }} />
+            ))}
+          </div>
+          <div className="flex gap-1">
+            {COLOR_MODES.map(([m, label]) => (
+              <button key={m} data-testid={`palette-mode-${m}`}
+                onClick={() => t.color && saveStyle({ color: t.color, color_mode: m })}
+                className={`flex-1 py-1 rounded-md text-[9px] font-mono font-bold uppercase ${
+                  (t.color_mode || "border") === m ? "bg-[var(--cyan)] text-black" : "bg-[var(--surface)] text-[var(--muted)]"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <button data-testid={`palette-clear-${t.name}`} onClick={() => saveStyle({ clear_color: true })}
+            className="mt-1.5 w-full py-1 rounded-md text-[9px] font-mono uppercase text-[var(--rose)] bg-[var(--rose)]/10">
+            Clear color
+          </button>
+        </div>
+      )}
+    </>
   );
 }

@@ -343,6 +343,37 @@ async def delete_staff(uid: str, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
+def _aggregate_paid_orders(paid: list, cats: dict, prods: dict, staff: dict):
+    """Slice paid orders by hour / category / payment method / staff / delivery platform."""
+    by_hour: dict = {}
+    by_cat: dict = {}
+    by_pay: dict = {}
+    by_staff: dict = {}
+    by_platform: dict = {}
+    for o in paid:
+        try:
+            h = datetime.fromisoformat(o["closed_at"]).astimezone(timezone.utc).hour
+        except Exception:
+            h = 0
+        by_hour[h] = by_hour.get(h, 0) + o.get("total", 0)
+        for l in o.get("lines", []):
+            p = prods.get(l["product_id"])
+            if p:
+                cn = cats.get(p["category_id"], "Other")
+                by_cat[cn] = by_cat.get(cn, 0) + l["price"] * l["qty"]
+        pay = (o.get("payment") or {}).get("method", "cash")
+        by_pay[pay] = by_pay.get(pay, 0) + o.get("total", 0)
+        sname = staff.get(o.get("server_id"), "—")
+        by_staff[sname] = by_staff.get(sname, 0) + o.get("total", 0)
+        if o.get("order_type") == "delivery":
+            d = o.get("delivery") or {}
+            row = by_platform.setdefault(d.get("platform", "unknown"), {"gross": 0, "fee": 0, "orders": 0})
+            row["gross"] += o.get("total", 0)
+            row["fee"] += d.get("fee", 0) or 0
+            row["orders"] += 1
+    return by_hour, by_cat, by_pay, by_staff, by_platform
+
+
 # ===================== REPORTS =====================
 @api.get("/reports/summary")
 async def reports_summary(user: dict = Depends(get_current_user)):
@@ -356,47 +387,11 @@ async def reports_summary(user: dict = Depends(get_current_user)):
     delivery_gross = sum(o.get("total", 0) for o in paid if o.get("order_type") == "delivery")
     net_revenue = round(total_revenue - delivery_fees, 2)
 
-    by_hour = {}
-    by_cat = {}
-    by_pay = {}
-    by_staff = {}
-    by_platform = {}
     cats = {str(c["_id"]): c["name"] for c in await db.categories.find().to_list(500)}
     prods = {str(p["_id"]): p for p in await db.products.find().to_list(2000)}
     staff = {str(u["_id"]): u.get("name") for u in await db.users.find().to_list(200)}
+    by_hour, by_cat, by_pay, by_staff, by_platform = _aggregate_paid_orders(paid, cats, prods, staff)
 
-    for o in paid:
-        # hour
-        try:
-            h = datetime.fromisoformat(o["closed_at"]).astimezone(timezone.utc).hour
-        except Exception:
-            h = 0
-        by_hour[h] = by_hour.get(h, 0) + o.get("total", 0)
-        # category
-        for l in o.get("lines", []):
-            p = prods.get(l["product_id"])
-            if p:
-                cn = cats.get(p["category_id"], "Other")
-                by_cat[cn] = by_cat.get(cn, 0) + l["price"] * l["qty"]
-        # payment
-        pay = (o.get("payment") or {}).get("method", "cash")
-        by_pay[pay] = by_pay.get(pay, 0) + o.get("total", 0)
-        # staff
-        sid = o.get("server_id")
-        sname = staff.get(sid, "—")
-        by_staff[sname] = by_staff.get(sname, 0) + o.get("total", 0)
-        # delivery platform breakdown (gross + fee + net)
-        if o.get("order_type") == "delivery":
-            d = o.get("delivery") or {}
-            plt = d.get("platform", "unknown")
-            row = by_platform.setdefault(plt, {"gross": 0, "fee": 0, "orders": 0})
-            row["gross"] += o.get("total", 0)
-            row["fee"] += d.get("fee", 0) or 0
-            row["orders"] += 1
-
-    hour_items = sorted(by_hour.items())
-    cat_items = sorted(by_cat.items(), key=lambda x: -x[1])
-    staff_items = sorted(by_staff.items(), key=lambda x: -x[1])
     return {
         "total_revenue": round(total_revenue, 2),
         "net_revenue": net_revenue,
@@ -404,15 +399,38 @@ async def reports_summary(user: dict = Depends(get_current_user)):
         "delivery_gross": round(delivery_gross, 2),
         "total_orders": total_orders,
         "avg_ticket": round(avg_ticket, 2),
-        "by_hour": [{"hour": hour, "revenue": round(v, 2)} for hour, v in hour_items],
-        "by_category": [{"name": k, "revenue": round(v, 2)} for k, v in cat_items],
+        "by_hour": [{"hour": hour, "revenue": round(v, 2)} for hour, v in sorted(by_hour.items())],
+        "by_category": [{"name": k, "revenue": round(v, 2)} for k, v in sorted(by_cat.items(), key=lambda x: -x[1])],
         "by_payment": [{"name": k, "revenue": round(v, 2)} for k, v in by_pay.items()],
-        "by_staff": [{"name": k, "revenue": round(v, 2)} for k, v in staff_items],
+        "by_staff": [{"name": k, "revenue": round(v, 2)} for k, v in sorted(by_staff.items(), key=lambda x: -x[1])],
         "by_delivery_platform": [
             {"platform": k, "gross": round(v["gross"], 2), "fee": round(v["fee"], 2),
              "net": round(v["gross"] - v["fee"], 2), "orders": v["orders"]}
             for k, v in by_platform.items()
         ],
+    }
+
+
+def _kds_ticket(o: dict, i: int, l: dict, prods: dict, tables: dict):
+    """Build one KDS ticket, or None if the line isn't currently displayed."""
+    if l.get("held") or not l.get("fired_at") or l.get("bumped_at"):
+        return None
+    p = prods.get(l.get("product_id", ""))
+    kind = (p or {}).get("kind") or ("drink" if l.get("course") == "drink" else "food")
+    t = tables.get(o.get("table_id") or "")
+    return {
+        "order_id": str(o["_id"]),
+        "line_index": i,
+        "product_id": l.get("product_id"),
+        "name": l["name"],
+        "qty": l["qty"],
+        "notes": l.get("notes", ""),
+        "modifiers": l.get("modifiers", []),
+        "course": l.get("course"),
+        "kind": kind,
+        "table": t["name"] if t else o.get("order_type", "").upper(),
+        "order_type": o.get("order_type"),
+        "fired_at": l.get("fired_at"),
     }
 
 
@@ -426,29 +444,14 @@ async def kds(station: str = "all", user: dict = Depends(get_current_user)):
     tickets = []
     for o in orders:
         for i, l in enumerate(o.get("lines", [])):
-            if l.get("held") or not l.get("fired_at") or l.get("bumped_at"):
+            tk = _kds_ticket(o, i, l, prods, tables)
+            if not tk:
                 continue
-            p = prods.get(l.get("product_id", ""))
-            kind = (p or {}).get("kind") or ("drink" if l.get("course") == "drink" else "food")
-            if station == "kitchen" and kind != "food":
+            if station == "kitchen" and tk["kind"] != "food":
                 continue
-            if station == "bar" and kind != "drink":
+            if station == "bar" and tk["kind"] != "drink":
                 continue
-            t = tables.get(o.get("table_id") or "")
-            tickets.append({
-                "order_id": str(o["_id"]),
-                "line_index": i,
-                "product_id": l.get("product_id"),
-                "name": l["name"],
-                "qty": l["qty"],
-                "notes": l.get("notes", ""),
-                "modifiers": l.get("modifiers", []),
-                "course": l.get("course"),
-                "kind": kind,
-                "table": t["name"] if t else o.get("order_type", "").upper(),
-                "order_type": o.get("order_type"),
-                "fired_at": l.get("fired_at"),
-            })
+            tickets.append(tk)
     tickets.sort(key=lambda x: x["fired_at"] or "")
     return tickets
 

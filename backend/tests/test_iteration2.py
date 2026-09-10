@@ -13,7 +13,7 @@ HK = ZoneInfo("Asia/Hong_Kong")
 @pytest.fixture(scope="session")
 def admin_token():
     r = requests.post(f"{BASE_URL}/api/auth/login",
-                      json={"email": "polymuze111@gmail.com", "password": "admin123"})
+                      json={"email": "lunalunamoonshine@gmail.com", "password": "admin123"})
     assert r.status_code == 200, r.text
     return r.json()["token"]
 

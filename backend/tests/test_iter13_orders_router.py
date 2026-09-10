@@ -19,7 +19,7 @@ load_dotenv(Path("/app/frontend/.env"))
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN = {"email": "polymuze111@gmail.com", "password": "admin123"}
+ADMIN = {"email": "lunalunamoonshine@gmail.com", "password": "admin123"}
 
 
 @pytest.fixture(scope="module")
@@ -225,7 +225,7 @@ def test_bump_fire_pay_flow(sess, products):
     # bump line 0
     r = sess.post(f"{API}/orders/{oid}/bump/0", timeout=15)
     assert r.status_code == 200, r.text
-    assert r.json().get("ok") is True
+    assert r.json().get("ok") == True
 
     # pay cash
     r = sess.post(f"{API}/orders/{oid}/pay", json={

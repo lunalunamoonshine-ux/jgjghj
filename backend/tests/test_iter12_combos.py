@@ -14,7 +14,7 @@ import requests
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "polymuze111@gmail.com"
+ADMIN_EMAIL = "lunalunamoonshine@gmail.com"
 ADMIN_PWD = "admin123"
 
 
@@ -166,11 +166,11 @@ def test_or_slot_semantics(client, pids):
         assert rr.status_code == 200, rr.text
         return any(c["name"] == combo["name"] for c in rr.json()["combos_applied"])
 
-    assert _combo_applied([_line(A, 1)]) is True, "1xA within [1,1] should match"
-    assert _combo_applied([_line(A, 1), _line(B, 1)]) is False, "total=2 > max=1 should NOT match"
-    assert _combo_applied([_line(A, 2)]) is False, "2xA > max=1 should NOT match"
+    assert _combo_applied([_line(A, 1)]) == True, "1xA within [1,1] should match"
+    assert _combo_applied([_line(A, 1), _line(B, 1)]) == False, "total=2 > max=1 should NOT match"
+    assert _combo_applied([_line(A, 2)]) == False, "2xA > max=1 should NOT match"
     # empty-of-slot order with only unrelated foods
-    assert _combo_applied([_line(pids["foodC"], 1)]) is False, "0 of both should NOT match"
+    assert _combo_applied([_line(pids["foodC"], 1)]) == False, "0 of both should NOT match"
 
 
 # ---------- AND-slot semantics ----------
@@ -191,10 +191,10 @@ def test_and_slot_semantics(client, pids):
         assert rr.status_code == 200
         return any(c["name"] == combo["name"] for c in rr.json()["combos_applied"])
 
-    assert _applied([_line(A), _line(B), _line(C)]) is True
-    assert _applied([_line(A), _line(B)]) is False, "missing C should NOT match"
-    assert _applied([_line(A, 3), _line(B), _line(C)]) is False, "qty=3 > max=2 should NOT match"
-    assert _applied([_line(A, 2), _line(B, 2), _line(C, 2)]) is True, "each at max=2 should match"
+    assert _applied([_line(A), _line(B), _line(C)]) == True
+    assert _applied([_line(A), _line(B)]) == False, "missing C should NOT match"
+    assert _applied([_line(A, 3), _line(B), _line(C)]) == False, "qty=3 > max=2 should NOT match"
+    assert _applied([_line(A, 2), _line(B, 2), _line(C, 2)]) == True, "each at max=2 should match"
 
 
 # ---------- Multi-slot end-to-end via create + patch ----------

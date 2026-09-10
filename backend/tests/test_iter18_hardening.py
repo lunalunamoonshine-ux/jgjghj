@@ -54,6 +54,16 @@ def _free_table(api):
     return t
 
 
+def _restock(api, names, qty):
+    """Idempotency helper: top up ingredients so repeated test runs never hit
+    the negative-stock guard (which would clamp deductions to zero)."""
+    ings = {i["name"]: i for i in api.get(f"{BASE_URL}/api/ingredients").json()}
+    for n in names:
+        r = api.post(f"{BASE_URL}/api/ingredients/{ings[n]['id']}/restock",
+                     json={"qty": qty, "note": "test top-up"})
+        assert r.status_code == 200, r.text
+
+
 # --- Auth: PIN login auto-clock-in ---
 class TestAuthPinShift:
     def test_email_login(self):
@@ -168,6 +178,8 @@ class TestInventory:
     def test_deduction_variant_and_modifier(self, api, products):
         drink = _find(products, "Neon Negroni")
         food = _find(products, "Truffle Fries")
+        # Idempotency: restock first so repeated runs never hit the negative-stock guard
+        _restock(api, ["Gin", "Campari", "Sweet Vermouth", "Fries (frozen)", "Parmesan"], 5000)
         ing_before = {i["name"]: i["qty"] for i in api.get(f"{BASE_URL}/api/ingredients").json()}
         table = _free_table(api)
         cr = api.post(f"{BASE_URL}/api/orders", json={
@@ -235,7 +247,7 @@ class TestInventory:
         try:
             rows = api.get(f"{BASE_URL}/api/ingredients").json()
             row = next(x for x in rows if x["id"] == iid)
-            assert row["low"] is True
+            assert row["low"] == True
         finally:
             api.delete(f"{BASE_URL}/api/ingredients/{iid}")
 
@@ -290,7 +302,7 @@ class TestCloudMirror:
     def test_sync_now(self, api):
         r = api.post(f"{BASE_URL}/api/cloud/sync")
         assert r.status_code == 200, r.text
-        assert r.json()["ok"] is True
+        assert r.json()["ok"] == True
 
     def test_status(self, api):
         r = api.get(f"{BASE_URL}/api/cloud/status")
@@ -358,7 +370,7 @@ class TestSplitMerge:
                          json={"source_id": o2["id"], "target_id": o1["id"]})
             assert m.status_code == 200, m.text
             merged = m.json()
-            assert merged.get("ok") is True
+            assert merged.get("ok") == True
             assert merged.get("line_count", 0) >= 2
         finally:
             api.delete(f"{BASE_URL}/api/orders/{o1['id']}")

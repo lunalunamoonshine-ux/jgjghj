@@ -16,7 +16,7 @@ def _login(email, password):
 
 @pytest.fixture(scope="session")
 def admin_h():
-    return {"Authorization": f"Bearer {_login('polymuze111@gmail.com', 'admin123')}"}
+    return {"Authorization": f"Bearer {_login('lunalunamoonshine@gmail.com', 'admin123')}"}
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ class TestEightySix:
         r = requests.post(f"{BASE_URL}/api/products/{pid}/eightysix",
                           params={"on": "true"}, headers=admin_h)
         assert r.status_code == 200, r.text
-        assert r.json()["eightysix"] is True
+        assert r.json()["eightysix"] == True
 
         # Public menu excludes
         pub = requests.get(f"{BASE_URL}/api/public/menu/{any_table['id']}").json()
@@ -51,13 +51,13 @@ class TestEightySix:
         # Admin product list still includes (needed for grid overlay)
         admin_prods = requests.get(f"{BASE_URL}/api/products", headers=admin_h).json()
         found = next((p for p in admin_prods if p["id"] == pid), None)
-        assert found and found.get("eightysix") is True
+        assert found and found.get("eightysix") == True
 
         # Un-86
         r2 = requests.post(f"{BASE_URL}/api/products/{pid}/eightysix",
                            params={"on": "false"}, headers=admin_h)
         assert r2.status_code == 200
-        assert r2.json()["eightysix"] is False
+        assert r2.json()["eightysix"] == False
         pub2 = requests.get(f"{BASE_URL}/api/public/menu/{any_table['id']}").json()
         assert pid in {p["id"] for p in pub2["products"]}
 

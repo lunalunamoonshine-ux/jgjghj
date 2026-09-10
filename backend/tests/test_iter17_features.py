@@ -9,7 +9,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://hk-bar-pos-pro.preview.emergentagent.com").rstrip("/")
 # Test credentials come from env; never commit real creds to source.
-ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "polymuze111@gmail.com")
+ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "lunalunamoonshine@gmail.com")
 ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
 
 

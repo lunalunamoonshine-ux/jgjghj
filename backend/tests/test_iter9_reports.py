@@ -4,7 +4,7 @@ import requests
 
 BASE = (os.environ.get("REACT_APP_BACKEND_URL") or "https://hk-bar-pos-pro.preview.emergentagent.com").rstrip("/")
 API = f"{BASE}/api"
-CREDS = {"email": "polymuze111@gmail.com", "password": "admin123"}
+CREDS = {"email": "lunalunamoonshine@gmail.com", "password": "admin123"}
 
 
 def _login():

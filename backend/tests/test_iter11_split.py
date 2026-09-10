@@ -11,7 +11,7 @@ import requests
 
 BASE = (os.environ.get("REACT_APP_BACKEND_URL") or "").rstrip("/")
 API = f"{BASE}/api"
-CREDS = {"email": "polymuze111@gmail.com", "password": "admin123"}
+CREDS = {"email": "lunalunamoonshine@gmail.com", "password": "admin123"}
 
 
 @pytest.fixture(scope="module")

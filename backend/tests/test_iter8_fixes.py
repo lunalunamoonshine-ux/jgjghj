@@ -5,7 +5,7 @@ import requests
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://hk-bar-pos-pro.preview.emergentagent.com").rstrip("/")
 API = f"{BASE}/api"
 
-CREDS = {"email": "polymuze111@gmail.com", "password": "admin123"}
+CREDS = {"email": "lunalunamoonshine@gmail.com", "password": "admin123"}
 
 
 def _login():
@@ -55,23 +55,14 @@ def test_pay_422_invalid_method_returns_readable_detail():
 
 def test_kds_returns_product_id():
     s = _login()
-    # Fetch existing KDS tickets and verify product_id is present on each.
-    kds = s.get(f"{API}/kds").json()
-    assert isinstance(kds, list) and len(kds) > 0, "No KDS tickets available to verify"
-    for t in kds:
-        assert "product_id" in t, f"missing product_id: {t}"
-    # Also verify one matches an actual product
+    # Self-sufficient: create + fire our own order (suite order must not matter)
     prods = {p["id"]: p for p in s.get(f"{API}/products").json()}
-    matched = [t for t in kds if t["product_id"] in prods]
-    assert matched, "no kds ticket product_id matched a product"
-    return
-
-    p = next((x for x in prods if not x.get("eightysix")), prods[0])
+    p = next((x for x in prods.values() if not x.get("eightysix")), list(prods.values())[0])
     payload = {
         "order_type": "pick_up", "guests": 1,
         "lines": [{"product_id": p["id"], "name": p["name"], "price": p["price"],
                    "qty": 1, "variant": None, "modifiers": [], "course": p.get("course", "main"),
-                   "held": False, "notes": ""}],
+                   "held": True, "notes": ""}],
         "discount_type": "none", "discount_value": 0, "service_charge_pct": 10, "notes": "TEST_iter8_kds",
     }
     r = s.post(f"{API}/orders", json=payload)
@@ -89,15 +80,32 @@ def test_kds_returns_product_id():
     t = mine[0]
     assert "product_id" in t, f"kds ticket missing product_id: {t}"
     assert t["product_id"] == p["id"], f"product_id mismatch {t['product_id']} != {p['id']}"
+    # All tickets expose product_id, and at least one matches a real product
+    for tk in kds:
+        assert "product_id" in tk, f"missing product_id: {tk}"
+    assert any(tk["product_id"] in prods for tk in kds), "no kds ticket product_id matched a product"
 
 
 def test_kds_86_flow_hides_from_public_menu():
     s = _login()
-    # Use an existing KDS ticket's product_id (simulates KDS UI flow)
+    # Self-sufficient: create + fire our own ticket to get a product_id
+    prods = {p["id"]: p for p in s.get(f"{API}/products").json()}
+    p = next((x for x in prods.values() if not x.get("eightysix")), list(prods.values())[0])
+    r = s.post(f"{API}/orders", json={
+        "order_type": "pick_up", "guests": 1,
+        "lines": [{"product_id": p["id"], "name": p["name"], "price": p["price"],
+                   "qty": 1, "variant": None, "modifiers": [], "course": p.get("course", "main"),
+                   "held": True, "notes": ""}],
+        "discount_type": "none", "discount_value": 0, "service_charge_pct": 10, "notes": "TEST_iter8_86",
+    })
+    assert r.status_code in (200, 201), r.text
+    oid = r.json()["id"]
+    fr = s.post(f"{API}/orders/{oid}/fire", params={"course": p.get("course", "main")})
+    assert fr.status_code == 200, fr.text
     kds = s.get(f"{API}/kds").json()
-    assert kds, "need existing KDS ticket"
-    t = kds[0]
-    pid = t["product_id"]
+    mine = [t for t in kds if t.get("order_id") == oid]
+    assert mine, f"no kds ticket for order {oid}"
+    pid = mine[0]["product_id"]
     assert pid, "kds ticket has no product_id"
 
     # 86 via product_id (as frontend now does)
@@ -106,7 +114,7 @@ def test_kds_86_flow_hides_from_public_menu():
 
     # Verify product.eightysix true
     p2 = next(x for x in s.get(f"{API}/products").json() if x["id"] == pid)
-    assert p2.get("eightysix") is True
+    assert p2.get("eightysix") == True
 
     # Verify /api/public/menu/{table_id} excludes it
     tables = s.get(f"{API}/tables").json()
