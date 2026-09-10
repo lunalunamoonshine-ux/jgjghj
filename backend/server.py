@@ -53,29 +53,35 @@ _ROLE_WRITE_ALLOW = {
 }
 
 
+def _role_from_request(request):
+    """Decode the caller's role from the access_token cookie or Bearer header."""
+    token = request.cookies.get("access_token")
+    auth = request.headers.get("Authorization", "")
+    if not token and auth.startswith("Bearer "):
+        token = auth[7:]
+    if not token:
+        return None
+    try:
+        return _jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"]).get("role")
+    except Exception:
+        return None
+
+
+def _is_write_allowed(role: str, path: str) -> bool:
+    allowed = any(path.startswith(pfx) for pfx in _ROLE_WRITE_ALLOW[role])
+    if role == "kitchen":
+        allowed = allowed or path.endswith("/eightysix") or path.endswith("/restock") or path.endswith("/wastage") or "/bump/" in path
+    if role in ("front_of_house", "kitchen") and (path.endswith("/pay") or "/payments/" in path):
+        allowed = False
+    return allowed
+
+
 @app.middleware("http")
 async def role_write_guard(request, call_next):
     if request.method in ("POST", "PATCH", "PUT", "DELETE"):
-        token = request.cookies.get("access_token")
-        _auth = request.headers.get("Authorization", "")
-        if not token and _auth.startswith("Bearer "):
-            token = _auth[7:]
-        payload = None
-        if token:
-            try:
-                payload = _jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"])
-            except Exception:
-                payload = None
-        role = (payload or {}).get("role")
-        if role in _ROLE_WRITE_ALLOW:
-            path = request.url.path
-            allowed = any(path.startswith(pfx) for pfx in _ROLE_WRITE_ALLOW[role])
-            if role == "kitchen":
-                allowed = allowed or path.endswith("/eightysix") or path.endswith("/restock") or path.endswith("/wastage") or "/bump/" in path
-            if role in ("front_of_house", "kitchen") and (path.endswith("/pay") or "/payments/" in path):
-                allowed = False
-            if not allowed:
-                return _JSONResponse({"detail": f"Role '{role}' cannot write to {path}"}, status_code=403)
+        role = _role_from_request(request)
+        if role in _ROLE_WRITE_ALLOW and not _is_write_allowed(role, request.url.path):
+            return _JSONResponse({"detail": f"Role '{role}' cannot write to {request.url.path}"}, status_code=403)
     return await call_next(request)
 
 

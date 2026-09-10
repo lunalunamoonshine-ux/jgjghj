@@ -136,37 +136,41 @@ function TableEditControls({ t, onResizeDown, delTable, onStyleChange }) {
         className="absolute -top-2 -left-2 w-6 h-6 rounded-full border-2 border-[var(--surface)] shadow-lg"
         style={{ background: t.color || "var(--surface-2)" }}
       />
-      {palette && (
-        <div
-          data-testid={`palette-${t.name}`}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="absolute top-full left-0 mt-2 z-50 p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] shadow-2xl w-44"
-        >
-          <div className="grid grid-cols-4 gap-1.5 mb-2">
-            {TABLE_COLORS.map((c) => (
-              <button key={c} data-testid={`palette-color-${c.replace("#", "")}`}
-                onClick={() => saveStyle({ color: c, color_mode: t.color_mode || "border" })}
-                className={`w-8 h-8 rounded-md border-2 ${t.color === c ? "border-white" : "border-transparent"}`}
-                style={{ background: c }} />
-            ))}
-          </div>
-          <div className="flex gap-1">
-            {COLOR_MODES.map(([m, label]) => (
-              <button key={m} data-testid={`palette-mode-${m}`}
-                onClick={() => t.color && saveStyle({ color: t.color, color_mode: m })}
-                className={`flex-1 py-1 rounded-md text-[9px] font-mono font-bold uppercase ${
-                  (t.color_mode || "border") === m ? "bg-[var(--cyan)] text-black" : "bg-[var(--surface)] text-[var(--muted)]"}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <button data-testid={`palette-clear-${t.name}`} onClick={() => saveStyle({ clear_color: true })}
-            className="mt-1.5 w-full py-1 rounded-md text-[9px] font-mono uppercase text-[var(--rose)] bg-[var(--rose)]/10">
-            Clear color
-          </button>
-        </div>
-      )}
+      {palette && <TableColorPalette t={t} onSave={saveStyle} />}
     </>
+  );
+}
+
+function TableColorPalette({ t, onSave }) {
+  return (
+    <div
+      data-testid={`palette-${t.name}`}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      className="absolute top-full left-0 mt-2 z-50 p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] shadow-2xl w-44"
+    >
+      <div className="grid grid-cols-4 gap-1.5 mb-2">
+        {TABLE_COLORS.map((c) => (
+          <button key={c} data-testid={`palette-color-${c.replace("#", "")}`}
+            onClick={() => onSave({ color: c, color_mode: t.color_mode || "border" })}
+            className={`w-8 h-8 rounded-md border-2 ${t.color === c ? "border-white" : "border-transparent"}`}
+            style={{ background: c }} />
+        ))}
+      </div>
+      <div className="flex gap-1">
+        {COLOR_MODES.map(([m, label]) => (
+          <button key={m} data-testid={`palette-mode-${m}`}
+            onClick={() => t.color && onSave({ color: t.color, color_mode: m })}
+            className={`flex-1 py-1 rounded-md text-[9px] font-mono font-bold uppercase ${
+              (t.color_mode || "border") === m ? "bg-[var(--cyan)] text-black" : "bg-[var(--surface)] text-[var(--muted)]"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button data-testid={`palette-clear-${t.name}`} onClick={() => onSave({ clear_color: true })}
+        className="mt-1.5 w-full py-1 rounded-md text-[9px] font-mono uppercase text-[var(--rose)] bg-[var(--rose)]/10">
+        Clear color
+      </button>
+    </div>
   );
 }

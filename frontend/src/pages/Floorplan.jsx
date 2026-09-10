@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, fmtHKD } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Move, Edit3, Check, Users as UsersIcon, Sparkles, Clock, DollarSign, AlertCircle, Radio, Trophy, Target, MoonStar, CreditCard, TrendingUp } from "lucide-react";
+import { Plus, Move, Edit3, Check, Users as UsersIcon, Sparkles, Clock, DollarSign, AlertCircle, Radio, Trophy, Target, MoonStar, CreditCard } from "lucide-react";
+import { useTableInteractions } from "@/components/pos/floorplan/useTableInteractions";
 import { ReservationModal, TableActionModal } from "@/components/pos/Reservations";
 import { QRCode as QRModal } from "@/components/pos/QRCode";
 import PreauthModal from "@/components/pos/PreauthModal";
@@ -28,8 +29,7 @@ export default function Floorplan() {
   const [activeArea, setActiveArea] = useState(null);
   const [tables, setTables] = useState([]);
   const [editMode, setEditMode] = useState(false);
-  const [drag, setDrag] = useState(null);
-  const [resize, setResize] = useState(null);
+  const { onDown, onResizeDown, onMove, onUp, onStyleChange } = useTableInteractions(tables, setTables, editMode);
   const [activeHH, setActiveHH] = useState([]);
   const [now, setNow] = useState(new Date());
   const [selTable, setSelTable] = useState(null);
@@ -130,54 +130,6 @@ export default function Floorplan() {
     return acc;
   }, {});
 
-  const onDown = (e, t) => {
-    if (!editMode) return;
-    const rect = e.currentTarget.parentElement.getBoundingClientRect();
-    setDrag({ id: t.id, startX: e.clientX, startY: e.clientY, x0: t.x, y0: t.y, rect });
-  };
-  const onResizeDown = (e, t) => {
-    if (!editMode) return;
-    setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w0: t.width, h0: t.height, shape: t.shape });
-  };
-  const onMove = (e) => {
-    if (resize) {
-      const dx = e.clientX - resize.startX;
-      const dy = e.clientY - resize.startY;
-      const w = Math.min(400, Math.max(60, resize.w0 + dx));
-      const h = resize.shape === "circle" ? w : Math.min(400, Math.max(60, resize.h0 + dy));
-      setTables((ts) => ts.map((t) => (t.id === resize.id ? { ...t, width: Math.round(w), height: Math.round(h) } : t)));
-      return;
-    }
-    if (!drag) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    setTables((ts) =>
-      ts.map((t) => (t.id === drag.id ? { ...t, x: Math.max(0, drag.x0 + dx), y: Math.max(0, drag.y0 + dy) } : t))
-    );
-  };
-  const onUp = async () => {
-    if (resize) {
-      const t = tables.find((x) => x.id === resize.id);
-      setResize(null);
-      if (!t) return;
-      try {
-        await api.patch(`/tables/${t.id}`, { width: t.width, height: t.height });
-      } catch {
-        toast.error("Failed to save size");
-      }
-      return;
-    }
-    if (!drag) return;
-    const t = tables.find((x) => x.id === drag.id);
-    setDrag(null);
-    if (!t) return;
-    try {
-      await api.patch(`/tables/${t.id}`, { x: t.x, y: t.y });
-    } catch {
-      toast.error("Failed to save position");
-    }
-  };
-
   const addTable = async () => {
     const name = prompt("Table name / label?");
     if (!name) return;
@@ -193,16 +145,6 @@ export default function Floorplan() {
     if (!confirm("Delete this table?")) return;
     await api.delete(`/tables/${id}`);
     setTables((t) => t.filter((x) => x.id !== id));
-  };
-
-  const onStyleChange = (id, body) => {
-    setTables((ts) => ts.map((t) => {
-      if (t.id !== id) return t;
-      const next = { ...t, ...body };
-      if (body.clear_color) next.color = null;
-      delete next.clear_color;
-      return next;
-    }));
   };
 
   const openTable = (t) => {

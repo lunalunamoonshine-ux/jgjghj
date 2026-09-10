@@ -70,6 +70,17 @@ async def _target_printers(role: str) -> list:
     return await db.printers.find({"role": {"$in": [role, "mixed"]}, "active": True}).to_list(20)
 
 
+async def _group_lines_by_role(lines: list) -> dict:
+    """Bucket lines by target printer role using product kind (drink->bar, food->kitchen)."""
+    prods = {str(p["_id"]): p for p in await db.products.find().to_list(2000)}
+    by_role: dict = {}
+    for l in lines:
+        p = prods.get(l.get("product_id") or "")
+        kind = (p or {}).get("kind") or ("drink" if l.get("course") == "drink" else "food")
+        by_role.setdefault(KIND_TO_ROLE.get(kind, "kitchen"), []).append(l)
+    return by_role
+
+
 async def route_ticket_lines(order: dict, lines: list, user: dict):
     """Route fired lines to bar/kitchen printers by product kind."""
     if not lines:
@@ -78,13 +89,7 @@ async def route_ticket_lines(order: dict, lines: list, user: dict):
     if order.get("table_id"):
         t = await db.tables.find_one({"_id": _oid(order["table_id"])})
         table_name = t["name"] if t else "TAKEAWAY"
-    prods = {str(p["_id"]): p for p in await db.products.find().to_list(2000)}
-    by_role: dict = {}
-    for l in lines:
-        p = prods.get(l.get("product_id") or "")
-        kind = (p or {}).get("kind") or ("drink" if l.get("course") == "drink" else "food")
-        by_role.setdefault(KIND_TO_ROLE.get(kind, "kitchen"), []).append(l)
-    for role, role_lines in by_role.items():
+    for role, role_lines in (await _group_lines_by_role(lines)).items():
         printers = await _target_printers(role)
         if not printers:
             await _alert("print", f"No active printer for role '{role}' — ticket for {table_name} NOT printed", str(order["_id"]))

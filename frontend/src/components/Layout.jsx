@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutGrid, Utensils, Users, Shield, LineChart, PartyPopper, LogOut, Sparkles, Flame, Clock, ClipboardList, Beer, Zap, Truck, Trophy, Printer, Boxes, Cloud, Target, ShieldCheck,
+  LayoutGrid, Utensils, Users, Shield, LineChart, LogOut, Sparkles, Flame, Clock, ClipboardList, Beer, Zap, Truck, Trophy, Printer, Boxes, Cloud, Target, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";

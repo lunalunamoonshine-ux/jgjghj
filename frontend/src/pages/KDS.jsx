@@ -109,52 +109,13 @@ export default function KDS() {
       </div>
 
       {tab === "prep" ? (
-        prep.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--border)] p-14 text-center">
-            <ChefHat size={40} className="mx-auto text-[var(--muted)] mb-3" />
-            <div className="font-display font-black text-xl mb-1">Nothing to prep</div>
-            <div className="text-sm text-[var(--muted)]">Fire course items from the register to batch here.</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {prep.map(item => (
-              <div key={item.name} data-testid={`prep-${item.name}`}
-                className="p-4 rounded-xl border border-[var(--amber)]/40 bg-[var(--amber)]/5">
-                <div className="flex items-baseline gap-3">
-                  <div className="font-display font-black text-4xl text-[var(--amber)] tabular-nums">×{item.total}</div>
-                  <div className="flex-1">
-                    <div className="font-display font-bold text-xl leading-tight">{item.name}</div>
-                    <div className="text-[10px] font-mono uppercase text-[var(--muted)]">{item.course} · {item.kind}</div>
-                  </div>
-                  <button data-testid={`prep-bump-all-${item.name}`}
-                    onClick={async () => {
-                      try {
-                        const r = await api.post("/kds/prep/bump", null, { params: { product_id: item.product_id } });
-                        toast.success(`Bumped ${r.data.bumped} tickets`);
-                        load();
-                      } catch { toast.error("Failed"); }
-                    }}
-                    disabled={!item.product_id}
-                    className="btn-neon px-3 py-2 rounded-lg text-xs font-mono uppercase flex items-center gap-1 disabled:opacity-40">
-                    <Check size={12} /> Bump All
-                  </button>
-                </div>
-                <div className="mt-3 pt-3 border-t border-[var(--border)]">
-                  <div className="text-[10px] font-mono uppercase text-[var(--muted)] mb-1">
-                    Across {item.tables.length} location{item.tables.length === 1 ? "" : "s"}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {item.tables.map(t => (
-                      <span key={t.name} className="px-2 py-1 rounded bg-[var(--surface-2)] border border-[var(--border)] text-xs font-mono">
-                        {t.name} <span className="text-[var(--amber)] font-bold">×{t.qty}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+        <PrepPanel prep={prep} onBumpAll={async (item) => {
+          try {
+            const r = await api.post("/kds/prep/bump", null, { params: { product_id: item.product_id } });
+            toast.success(`Bumped ${r.data.bumped} tickets`);
+            load();
+          } catch { toast.error("Failed"); }
+        }} />
       ) : (
       <>
       <div className="grid grid-cols-4 gap-3 mb-4">
@@ -288,6 +249,52 @@ export default function KDS() {
       )}
       </>
       )}
+    </div>
+  );
+}
+
+function PrepPanel({ prep, onBumpAll }) {
+  if (prep.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-[var(--border)] p-14 text-center">
+        <ChefHat size={40} className="mx-auto text-[var(--muted)] mb-3" />
+        <div className="font-display font-black text-xl mb-1">Nothing to prep</div>
+        <div className="text-sm text-[var(--muted)]">Fire course items from the register to batch here.</div>
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {prep.map(item => (
+        <div key={item.name} data-testid={`prep-${item.name}`}
+          className="p-4 rounded-xl border border-[var(--amber)]/40 bg-[var(--amber)]/5">
+          <div className="flex items-baseline gap-3">
+            <div className="font-display font-black text-4xl text-[var(--amber)] tabular-nums">×{item.total}</div>
+            <div className="flex-1">
+              <div className="font-display font-bold text-xl leading-tight">{item.name}</div>
+              <div className="text-[10px] font-mono uppercase text-[var(--muted)]">{item.course} · {item.kind}</div>
+            </div>
+            <button data-testid={`prep-bump-all-${item.name}`}
+              onClick={() => onBumpAll(item)}
+              disabled={!item.product_id}
+              className="btn-neon px-3 py-2 rounded-lg text-xs font-mono uppercase flex items-center gap-1 disabled:opacity-40">
+              <Check size={12} /> Bump All
+            </button>
+          </div>
+          <div className="mt-3 pt-3 border-t border-[var(--border)]">
+            <div className="text-[10px] font-mono uppercase text-[var(--muted)] mb-1">
+              Across {item.tables.length} location{item.tables.length === 1 ? "" : "s"}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {item.tables.map(t => (
+                <span key={t.name} className="px-2 py-1 rounded bg-[var(--surface-2)] border border-[var(--border)] text-xs font-mono">
+                  {t.name} <span className="text-[var(--amber)] font-bold">×{t.qty}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

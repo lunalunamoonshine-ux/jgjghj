@@ -11,6 +11,7 @@ import PaymentModal from "@/components/pos/register/PaymentModal";
 import Receipt from "@/components/pos/Receipt";
 import ManagerPin from "@/components/pos/ManagerPin";
 import { errMsg } from "@/lib/errors";
+import { useHappyHour } from "@/components/pos/register/useHappyHour";
 
 export default function Register() {
   const [sp] = useSearchParams();
@@ -27,29 +28,14 @@ export default function Register() {
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [members, setMembers] = useState([]);
   const [memberQ, setMemberQ] = useState("");
-  const [activeHH, setActiveHH] = useState([]);
   const [pinGate, setPinGate] = useState(null);
 
   const orderId = sp.get("order");
   const tableId = sp.get("table");
   const areaId = sp.get("area");
 
-  // ---- Happy Hour helpers ----
-  const hhFor = useCallback((p) => {
-    if (!p?.happy_hour_eligible) return 0;
-    let best = 0;
-    for (const h of activeHH) {
-      if ((h.category_ids || []).includes(p.category_id)) {
-        best = Math.max(best, h.percent_off || 0);
-      }
-    }
-    return best;
-  }, [activeHH]);
-
-  const hhPrice = useCallback((p, base = p.price) => {
-    const pct = hhFor(p);
-    return pct ? +(base * (1 - pct / 100)).toFixed(2) : base;
-  }, [hhFor]);
+  // ---- Happy Hour helpers (shared hook) ----
+  const { activeHH, hhFor, hhPrice } = useHappyHour();
 
   // ---- Data loading ----
   useEffect(() => {
@@ -59,13 +45,6 @@ export default function Register() {
     });
     api.get("/products").then((r) => setProducts(r.data));
     api.get("/combos").then((r) => setCombos(r.data));
-  }, [api]);
-
-  useEffect(() => {
-    const loadHH = () => api.get("/happy-hours/active").then((r) => setActiveHH(r.data.active || []));
-    loadHH();
-    const t = setInterval(loadHH, 60000);
-    return () => clearInterval(t);
   }, [api]);
 
   useEffect(() => {

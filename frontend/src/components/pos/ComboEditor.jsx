@@ -5,17 +5,20 @@ import ComboScheduleFields from "@/components/pos/combo/ComboScheduleFields";
 
 const SLOT_LABELS = ["Slot A", "Slot B", "Slot C", "Slot D"];
 
+function initialSlotsFor(combo) {
+  if (combo?.slots?.length) return combo.slots;
+  if (combo?.product_ids?.length) {
+    return [{ operator: "or", min_qty: 1, max_qty: 99, product_ids: combo.product_ids }];
+  }
+  return [{ operator: "or", min_qty: 1, max_qty: 1, product_ids: [] }];
+}
+
 export function ComboEditor({ combo, products, onClose, onSave }) {
   const [name, setName] = useState(combo?.name || "");
   const [type, setType] = useState(combo?.discount_type || "percent");
   const [value, setValue] = useState(combo?.discount_value ?? 15);
   const [active, setActive] = useState(combo?.active ?? true);
-  const initialSlots = combo?.slots?.length
-    ? combo.slots
-    : (combo?.product_ids?.length
-        ? [{ operator: "or", min_qty: 1, max_qty: 99, product_ids: combo.product_ids }]
-        : [{ operator: "or", min_qty: 1, max_qty: 1, product_ids: [] }]);
-  const [slots, setSlots] = useState(initialSlots);
+  const [slots, setSlots] = useState(() => initialSlotsFor(combo));
   // Deal-of-the-night rotator
   const [schedEnabled, setSchedEnabled] = useState(!!combo?.schedule);
   const [days, setDays] = useState(combo?.schedule?.days || []);

@@ -146,50 +146,68 @@ export function HappyHourEditor({ hh, categories, onClose, onSave }) {
       <Field label="Name">
         <input data-testid="edit-hh-name" value={name} onChange={(e) => setName(e.target.value)} className={inp} />
       </Field>
-      <Field label="Preset Tiers">
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            ["Opening", "15:00", "18:00", 10],
-            ["Evening", "18:00", "21:00", 20],
-            ["Late-night", "21:00", "03:00", 30],
-          ].map(([label, s, e, pct]) => (
-            <button key={label} data-testid={`hh-preset-${label}`}
-              onClick={() => { setStart(s); setEnd(e); setPercent(pct); if (!name) setName(`${label} Hour`); }}
-              className="p-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] text-left hover:border-[var(--amber)]">
-              <div className="text-xs font-semibold">{label}</div>
-              <div className="text-[10px] font-mono text-[var(--muted)]">{s}–{e} · -{pct}%</div>
-            </button>
-          ))}
-        </div>
-      </Field>
+      <HhPresetTiers name={name} onPick={(label, s, e, pct) => { setStart(s); setEnd(e); setPercent(pct); if (!name) setName(`${label} Hour`); }} />
       <div className="grid grid-cols-3 gap-4">
         <Field label="Start (24h)"><input data-testid="edit-hh-start" type="time" value={start} onChange={(e) => setStart(e.target.value)} className={inp} /></Field>
         <Field label="End (24h)"><input data-testid="edit-hh-end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} className={inp} /></Field>
         <Field label="Percent Off"><input data-testid="edit-hh-percent" type="number" value={percent} onChange={(e) => setPercent(parseFloat(e.target.value) || 0)} className={inp} /></Field>
       </div>
-      <Field label="Days">
-        <div className="flex gap-2">
-          {DAY_NAMES.map((d, i) => (
-            <button key={d} onClick={() => toggleDay(i)} data-testid={`hh-day-${d}`}
-              className={`flex-1 py-2 rounded-md border text-xs font-mono uppercase ${days.includes(i) ? "bg-[var(--amber)]/20 border-[var(--amber)] text-[var(--amber)]" : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"}`}>
-              {d}
-            </button>
-          ))}
-        </div>
-      </Field>
-      <Field label="Eligible Categories">
-        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-          {categories.map((c) => (
-            <button key={c.id} onClick={() => toggleCat(c.id)} data-testid={`hh-cat-${c.name}`}
-              className={`p-2 rounded-md border text-left ${catIds.includes(c.id) ? "bg-[var(--cyan)]/15 border-[var(--cyan)] text-[var(--cyan)]" : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"}`}>
-              <div className="w-2 h-2 rounded-full mb-1" style={{ background: c.color }} />
-              <div className="text-xs font-semibold">{c.name}</div>
-            </button>
-          ))}
-        </div>
-      </Field>
+      <HhDayPicker days={days} onToggle={toggleDay} />
+      <HhCategoryPicker categories={categories} catIds={catIds} onToggle={toggleCat} />
       <Footer onClose={onClose} onSave={() => onSave({ name, start_time: start, end_time: end, percent_off: percent, days, category_ids: catIds })} testid="edit-hh-save" />
     </Overlay>
+  );
+}
+
+function HhPresetTiers({ name, onPick }) {
+  return (
+    <Field label="Preset Tiers">
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          ["Opening", "15:00", "18:00", 10],
+          ["Evening", "18:00", "21:00", 20],
+          ["Late-night", "21:00", "03:00", 30],
+        ].map(([label, s, e, pct]) => (
+          <button key={label} data-testid={`hh-preset-${label}`}
+            onClick={() => onPick(label, s, e, pct)}
+            className="p-2 rounded-md border border-[var(--border)] bg-[var(--surface-2)] text-left hover:border-[var(--amber)]">
+            <div className="text-xs font-semibold">{label}</div>
+            <div className="text-[10px] font-mono text-[var(--muted)]">{s}–{e} · -{pct}%</div>
+          </button>
+        ))}
+      </div>
+    </Field>
+  );
+}
+
+function HhDayPicker({ days, onToggle }) {
+  return (
+    <Field label="Days">
+      <div className="flex gap-2">
+        {DAY_NAMES.map((d, i) => (
+          <button key={d} onClick={() => onToggle(i)} data-testid={`hh-day-${d}`}
+            className={`flex-1 py-2 rounded-md border text-xs font-mono uppercase ${days.includes(i) ? "bg-[var(--amber)]/20 border-[var(--amber)] text-[var(--amber)]" : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"}`}>
+            {d}
+          </button>
+        ))}
+      </div>
+    </Field>
+  );
+}
+
+function HhCategoryPicker({ categories, catIds, onToggle }) {
+  return (
+    <Field label="Eligible Categories">
+      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+        {categories.map((c) => (
+          <button key={c.id} onClick={() => onToggle(c.id)} data-testid={`hh-cat-${c.name}`}
+            className={`p-2 rounded-md border text-left ${catIds.includes(c.id) ? "bg-[var(--cyan)]/15 border-[var(--cyan)] text-[var(--cyan)]" : "bg-[var(--surface-2)] border-[var(--border)] text-[var(--muted)]"}`}>
+            <div className="w-2 h-2 rounded-full mb-1" style={{ background: c.color }} />
+            <div className="text-xs font-semibold">{c.name}</div>
+          </button>
+        ))}
+      </div>
+    </Field>
   );
 }
 

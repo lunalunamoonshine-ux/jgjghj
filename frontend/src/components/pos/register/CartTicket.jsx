@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { fmtHKD } from "@/lib/api";
 import {
   Plus, Minus, Trash2, Pause, Play, Flame, Lock, ArrowLeftRight,
-  ShoppingBag, Truck, UtensilsCrossed, User as UserIcon,
+  ShoppingBag, Truck, UtensilsCrossed,
 } from "lucide-react";
-import { api } from "@/lib/api";
 
 const COURSES = ["starter", "main", "dessert", "drink", "side", "other"];
 const ORDER_TYPES = [
@@ -115,6 +113,64 @@ function FireCourseBar({ onFire, disabled }) {
   );
 }
 
+function lineBorderClass(l, comboLocked, hhLocked) {
+  if (l.held) return "border-dashed border-[var(--amber)] bg-[var(--amber)]/5";
+  if (comboLocked) return "border-[var(--cyan)]/60 bg-[var(--cyan)]/5";
+  if (hhLocked) return "border-[var(--amber)]/50 bg-[var(--amber)]/5";
+  return "border-[var(--border)] bg-[var(--surface-2)]";
+}
+
+function TicketLine({ l, i, hhLocked, comboLocked, comboName, onQty, onHold, onSeat, onRemove }) {
+  const seat = l.seat || 1;
+  return (
+    <div data-testid={`cart-line-${i}`} className={`p-2 rounded-lg border ${lineBorderClass(l, comboLocked, hhLocked)}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <div className="font-semibold text-sm text-white flex items-center gap-1.5">
+            <button data-testid={`line-seat-${i}`} onClick={() => onSeat(i)}
+              title="Cycle seat #"
+              className="px-1.5 py-0.5 rounded bg-[var(--purple)]/20 border border-[var(--purple)]/40 text-[var(--purple)] text-[10px] font-mono flex items-center gap-1 hover:bg-[var(--purple)]/30">
+              <ArrowLeftRight size={9} /> S{seat}
+            </button>
+            <span>{l.name}</span>
+          </div>
+          {l.modifiers?.length > 0 && (
+            <div className="text-[10px] text-[var(--muted)]">+ {l.modifiers.join(", ")}</div>
+          )}
+          <div className="text-[10px] font-mono uppercase text-[var(--muted)] mt-0.5 flex items-center gap-1 flex-wrap">
+            <span>{l.course}</span>
+            {l.held && <span>· HELD</span>}
+            {hhLocked && (
+              <span data-testid={`lock-hh-${i}`}
+                className="ml-1 px-1.5 py-0.5 rounded bg-[var(--amber)]/20 border border-[var(--amber)]/50 text-[var(--amber)] flex items-center gap-1">
+                <Lock size={9} /> HH -{l.hh_pct}%
+              </span>
+            )}
+            {comboLocked && (
+              <span data-testid={`lock-combo-${i}`}
+                className="ml-1 px-1.5 py-0.5 rounded bg-[var(--cyan)]/20 border border-[var(--cyan)]/50 text-[var(--cyan)] flex items-center gap-1">
+                <Lock size={9} /> COMBO · {comboName}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-sm text-[var(--amber)]">{fmtHKD(l.price * l.qty)}</div>
+          <div className="flex items-center gap-1 mt-1 justify-end">
+            <button data-testid={`line-hold-${i}`} onClick={() => onHold(i)} className="w-6 h-6 rounded bg-[var(--surface)] text-[var(--amber)]">
+              {l.held ? <Play size={12} /> : <Pause size={12} />}
+            </button>
+            <button data-testid={`line-minus-${i}`} onClick={() => onQty(i, -1)} className="w-6 h-6 rounded bg-[var(--surface)]"><Minus size={12} /></button>
+            <span className="w-5 text-center text-xs font-mono">{l.qty}</span>
+            <button data-testid={`line-plus-${i}`} onClick={() => onQty(i, 1)} className="w-6 h-6 rounded bg-[var(--surface)]"><Plus size={12} /></button>
+            <button data-testid={`line-del-${i}`} onClick={() => onRemove(i)} className="w-6 h-6 rounded bg-[var(--surface)] text-[var(--rose)]"><Trash2 size={12} /></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TicketLines({ order, setOrder, onRemove, totals }) {
   const qtyChange = (i, d) =>
     setOrder((o) => {
@@ -148,64 +204,14 @@ function TicketLines({ order, setOrder, onRemove, totals }) {
       {order.lines.length === 0 && (
         <div className="text-center text-[var(--muted)] text-sm py-10">Tap products to add</div>
       )}
-      {order.lines.map((l, i) => {
-        const hhLocked = hhSet.has(l.product_id);
-        const comboLocked = comboSet.has(l.product_id);
-        const seat = l.seat || 1;
-        return (
-        <div key={`${l.product_id}-${l.variant || ""}-${i}`}
-          data-testid={`cart-line-${i}`}
-          className={`p-2 rounded-lg border ${
-            l.held ? "border-dashed border-[var(--amber)] bg-[var(--amber)]/5" :
-            comboLocked ? "border-[var(--cyan)]/60 bg-[var(--cyan)]/5" :
-            hhLocked ? "border-[var(--amber)]/50 bg-[var(--amber)]/5" :
-            "border-[var(--border)] bg-[var(--surface-2)]"
-          }`}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1">
-              <div className="font-semibold text-sm text-white flex items-center gap-1.5">
-                <button data-testid={`line-seat-${i}`} onClick={() => cycleSeat(i)}
-                  title="Cycle seat #"
-                  className="px-1.5 py-0.5 rounded bg-[var(--purple)]/20 border border-[var(--purple)]/40 text-[var(--purple)] text-[10px] font-mono flex items-center gap-1 hover:bg-[var(--purple)]/30">
-                  <ArrowLeftRight size={9} /> S{seat}
-                </button>
-                <span>{l.name}</span>
-              </div>
-              {l.modifiers?.length > 0 && (
-                <div className="text-[10px] text-[var(--muted)]">+ {l.modifiers.join(", ")}</div>
-              )}
-              <div className="text-[10px] font-mono uppercase text-[var(--muted)] mt-0.5 flex items-center gap-1 flex-wrap">
-                <span>{l.course}</span>
-                {l.held && <span>· HELD</span>}
-                {hhLocked && (
-                  <span data-testid={`lock-hh-${i}`}
-                    className="ml-1 px-1.5 py-0.5 rounded bg-[var(--amber)]/20 border border-[var(--amber)]/50 text-[var(--amber)] flex items-center gap-1">
-                    <Lock size={9} /> HH -{l.hh_pct}%
-                  </span>
-                )}
-                {comboLocked && (
-                  <span data-testid={`lock-combo-${i}`}
-                    className="ml-1 px-1.5 py-0.5 rounded bg-[var(--cyan)]/20 border border-[var(--cyan)]/50 text-[var(--cyan)] flex items-center gap-1">
-                    <Lock size={9} /> COMBO · {comboMap[l.product_id]}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="font-mono text-sm text-[var(--amber)]">{fmtHKD(l.price * l.qty)}</div>
-              <div className="flex items-center gap-1 mt-1 justify-end">
-                <button data-testid={`line-hold-${i}`} onClick={() => toggleHold(i)} className="w-6 h-6 rounded bg-[var(--surface)] text-[var(--amber)]">
-                  {l.held ? <Play size={12} /> : <Pause size={12} />}
-                </button>
-                <button data-testid={`line-minus-${i}`} onClick={() => qtyChange(i, -1)} className="w-6 h-6 rounded bg-[var(--surface)]"><Minus size={12} /></button>
-                <span className="w-5 text-center text-xs font-mono">{l.qty}</span>
-                <button data-testid={`line-plus-${i}`} onClick={() => qtyChange(i, 1)} className="w-6 h-6 rounded bg-[var(--surface)]"><Plus size={12} /></button>
-                <button data-testid={`line-del-${i}`} onClick={() => onRemove(i)} className="w-6 h-6 rounded bg-[var(--surface)] text-[var(--rose)]"><Trash2 size={12} /></button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );})}
+      {order.lines.map((l, i) => (
+        <TicketLine key={`${l.product_id}-${l.variant || ""}-${i}`}
+          l={l} i={i}
+          hhLocked={hhSet.has(l.product_id)}
+          comboLocked={comboSet.has(l.product_id)}
+          comboName={comboMap[l.product_id]}
+          onQty={qtyChange} onHold={toggleHold} onSeat={cycleSeat} onRemove={onRemove} />
+      ))}
       {(hhSet.size > 0 || comboSet.size > 0) && (
         <div data-testid="exclusivity-note"
           className="mt-2 px-2 py-1.5 rounded border border-dashed border-[var(--border)] text-[10px] font-mono uppercase text-[var(--muted)] flex items-center gap-1">

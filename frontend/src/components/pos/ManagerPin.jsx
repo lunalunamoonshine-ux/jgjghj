@@ -3,11 +3,23 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Shield, X, Delete } from "lucide-react";
 
+const pinKeyClass = (k) => {
+  if (k === "enter") return "btn-amber border-transparent";
+  if (k === "back") return "bg-[var(--surface-2)] border-[var(--border)] text-[var(--rose)]";
+  return "bg-[var(--surface-2)] border-[var(--border)] text-white hover:border-[var(--cyan)]";
+};
+const pinKeyLabel = (k) => {
+  if (k === "back") return <Delete size={16} className="mx-auto" />;
+  if (k === "enter") return "OK";
+  return k;
+};
+
+
 /**
  * Manager PIN gate.
- * <ManagerPin action="void this item" onSuccess={fn} onClose={fn} requiredRoles={["manager","admin"]} />
+ * <ManagerPin action="void this item" onSuccess={fn} onClose={fn} requiredRoles={["owner","admin","manager","assistant_manager"]} />
  */
-export default function ManagerPin({ action = "authorize", onSuccess, onClose, requiredRoles = ["manager", "admin"] }) {
+export default function ManagerPin({ action = "authorize", onSuccess, onClose, requiredRoles = ["owner", "admin", "manager", "assistant_manager"] }) {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -54,15 +66,9 @@ export default function ManagerPin({ action = "authorize", onSuccess, onClose, r
               data-testid={`mgr-pin-${k}`}
               onClick={() => tap(k)}
               disabled={busy}
-              className={`h-12 rounded-lg font-display text-lg font-bold border ${
-                k === "enter"
-                  ? "btn-amber border-transparent"
-                  : k === "back"
-                  ? "bg-[var(--surface-2)] border-[var(--border)] text-[var(--rose)]"
-                  : "bg-[var(--surface-2)] border-[var(--border)] text-white hover:border-[var(--cyan)]"
-              }`}
+              className={`h-12 rounded-lg font-display text-lg font-bold border ${pinKeyClass(k)}`}
             >
-              {k === "back" ? <Delete size={16} className="mx-auto" /> : k === "enter" ? "OK" : k}
+              {pinKeyLabel(k)}
             </button>
           ))}
         </div>

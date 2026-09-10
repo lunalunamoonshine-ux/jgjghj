@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Zap, Send, X, Beer, Plus, Minus, TrendingUp } from "lucide-react";
 import Receipt from "@/components/pos/Receipt";
 import { errMsg } from "@/lib/errors";
+import { useHappyHour } from "@/components/pos/register/useHappyHour";
 
 /**
  * Quick Bar Mode — one-tap bartender screen.
@@ -11,7 +12,6 @@ import { errMsg } from "@/lib/errors";
  */
 export default function QuickBar() {
   const [products, setProducts] = useState([]);
-  const [activeHH, setActiveHH] = useState([]);
   const [cart, setCart] = useState([]);
   const [combos, setCombos] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -26,18 +26,7 @@ export default function QuickBar() {
     return () => clearInterval(t);
   }, [api]);
 
-  const hhFor = (p) => {
-    if (!p.happy_hour_eligible) return 0;
-    let best = 0;
-    for (const h of activeHH) {
-      if ((h.category_ids || []).includes(p.category_id)) best = Math.max(best, h.percent_off || 0);
-    }
-    return best;
-  };
-  const priceOf = (p) => {
-    const pct = hhFor(p);
-    return pct ? +(p.price * (1 - pct / 100)).toFixed(2) : p.price;
-  };
+  const { activeHH, hhFor, hhPrice: priceOf } = useHappyHour();
 
   const addTile = (p) => {
     const pct = hhFor(p);
