@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import { Cloud, RefreshCw, ShieldCheck, BellRing, CalendarClock, Ban } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
+const MIRROR_TOOLTIP_STYLE = { background: "#1A1D2B", border: "1px solid #282C3F" };
+const MIRROR_DOT_STYLE = { r: 3 };
+
 export default function CloudMirror() {
   const [status, setStatus] = useState(null);
   const [report, setReport] = useState(null);
@@ -103,8 +106,8 @@ export default function CloudMirror() {
             <LineChart data={[...report.history].reverse().map((h) => ({ t: new Date(h.ts).toLocaleTimeString("en-HK", { hour12: false }), revenue: h.sales?.total_revenue || 0 }))}>
               <XAxis dataKey="t" stroke="#687087" fontSize={10} />
               <YAxis stroke="#687087" fontSize={10} />
-              <Tooltip contentStyle={{ background: "#1A1D2B", border: "1px solid #282C3F" }} />
-              <Line type="monotone" dataKey="revenue" stroke="#00F2FE" strokeWidth={2} dot={{ r: 3 }} />
+              <Tooltip contentStyle={MIRROR_TOOLTIP_STYLE} />
+              <Line type="monotone" dataKey="revenue" stroke="#00F2FE" strokeWidth={2} dot={MIRROR_DOT_STYLE} />
             </LineChart>
           </ResponsiveContainer>
         </div>

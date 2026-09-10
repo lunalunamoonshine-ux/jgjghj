@@ -78,18 +78,12 @@ def _apply_combos(lines: list, subtotal: float, hh_locked: set, combos):
     if not combos:
         return combo_discount, combos_applied, combo_locked
 
-    def _potential(c):
-        return (
-            subtotal * (c.get("discount_value", 0) / 100)
-            if c.get("discount_type") == "percent"
-            else c.get("discount_value", 0)
-        )
-
-    for c in sorted([c for c in combos if c.get("active", True)], key=_potential, reverse=True):
+    for c in sorted([c for c in combos if c.get("active", True)],
+                    key=lambda c: _potential_discount(c, subtotal), reverse=True):
         involved = _combo_involved_pids(c)
         if involved & combo_locked or not _combo_matches(c, line_qtys):
             continue
-        d = _potential(c)
+        d = _potential_discount(c, subtotal)
         combo_discount += d
         combos_applied.append({
             "name": c.get("name"),
@@ -500,9 +494,36 @@ def _potential_discount(c: dict, subtotal_hint: float) -> float:
     return c.get("discount_value", 0)
 
 
+def _hint_for_combo(c: dict, line_qtys: dict, sub_now: float, prods: dict, hh_locked: set):
+    """First single-product addition that would complete combo c, or None."""
+    if _combo_matches(c, line_qtys):
+        return None  # already applied — skip
+    for pid in _combo_involved_pids(c):
+        if pid in hh_locked or pid not in prods:
+            continue
+        trial = dict(line_qtys)
+        trial[pid] = trial.get(pid, 0) + 1
+        if not _combo_matches(c, trial):
+            continue
+        p = prods[pid]
+        price = p.get("price", 0) or 0
+        d = _potential_discount(c, sub_now + price)
+        return {
+            "combo_id": str(c["_id"]),
+            "combo_name": c.get("name"),
+            "product_id": pid,
+            "product_name": p.get("name"),
+            "product_price": price,
+            "discount": round(d, 2),
+            "discount_type": c.get("discount_type"),
+            "discount_value": c.get("discount_value"),
+            "net_gain": round(d - price, 2),  # positive if the discount beats the extra product's cost
+        }
+    return None
+
+
 def _table_combo_hints(o: dict, combos: list, prods: dict) -> list:
-    """Up to 3 upsell hints for one open order: single-product additions that
-    would tip the order into a combo, ranked by net gain."""
+    """Up to 3 upsell hints for one open order, ranked by net gain."""
     hh_locked = {l.get("product_id") for l in o["lines"] if (l.get("hh_pct") or 0) > 0}
     line_qtys: dict = {}
     for l in o["lines"]:
@@ -510,31 +531,7 @@ def _table_combo_hints(o: dict, combos: list, prods: dict) -> list:
         if pid and pid not in hh_locked and (l.get("qty") or 0) > 0:
             line_qtys[pid] = line_qtys.get(pid, 0) + l["qty"]
     sub_now = sum(l["price"] * l["qty"] for l in o["lines"])
-    hints = []
-    for c in combos:
-        if _combo_matches(c, line_qtys):
-            continue  # already applied — skip
-        for pid in _combo_involved_pids(c):
-            if pid in hh_locked or pid not in prods:
-                continue
-            trial = dict(line_qtys)
-            trial[pid] = trial.get(pid, 0) + 1
-            if _combo_matches(c, trial):
-                p = prods[pid]
-                price = p.get("price", 0) or 0
-                d = _potential_discount(c, sub_now + price)
-                hints.append({
-                    "combo_id": str(c["_id"]),
-                    "combo_name": c.get("name"),
-                    "product_id": pid,
-                    "product_name": p.get("name"),
-                    "product_price": price,
-                    "discount": round(d, 2),
-                    "discount_type": c.get("discount_type"),
-                    "discount_value": c.get("discount_value"),
-                    "net_gain": round(d - price, 2),  # positive if the discount beats the extra product's cost
-                })
-                break  # 1 hint per combo is enough
+    hints = [h for c in combos if (h := _hint_for_combo(c, line_qtys, sub_now, prods, hh_locked))]
     hints.sort(key=lambda h: -h["net_gain"])
     return hints[:3]
 

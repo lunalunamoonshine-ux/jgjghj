@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, CreditCard, User as UserIcon, Users } from "lucide-react";
 
-export default function PreauthModal({ table, onClose, onOpened }) {
+function usePreauthForm(table, onOpened) {
   const [name, setName] = useState("");
   const [last4, setLast4] = useState("");
   const [hold, setHold] = useState(500);
@@ -38,6 +38,13 @@ export default function PreauthModal({ table, onClose, onOpened }) {
     } finally { setBusy(false); }
   };
 
+  return { name, setName, last4, setLast4, hold, setHold, size, setSize,
+           busy, stripeReady, stripeInfo, canOpen, createStripeHold, submit };
+}
+
+export default function PreauthModal({ table, onClose, onOpened }) {
+  const f = usePreauthForm(table, onOpened);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
@@ -54,44 +61,50 @@ export default function PreauthModal({ table, onClose, onOpened }) {
         </div>
         <div className="space-y-3">
           <Field icon={UserIcon} label="Guest name">
-            <input data-testid="preauth-name" value={name} onChange={(e) => setName(e.target.value)}
+            <input data-testid="preauth-name" value={f.name} onChange={(e) => f.setName(e.target.value)}
               className={inp} placeholder="e.g. Michael Cheung" />
           </Field>
           <Field icon={CreditCard} label="Card last 4">
-            <input data-testid="preauth-last4" value={last4} inputMode="numeric" maxLength="4"
-              onChange={(e) => setLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            <input data-testid="preauth-last4" value={f.last4} inputMode="numeric" maxLength="4"
+              onChange={(e) => f.setLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
               className={`${inp} font-mono tracking-widest`} placeholder="1234" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Hold amount HKD">
-              <input data-testid="preauth-hold" type="number" min="0" value={hold}
-                onChange={(e) => setHold(e.target.value)} className={inp} />
+              <input data-testid="preauth-hold" type="number" min="0" value={f.hold}
+                onChange={(e) => f.setHold(e.target.value)} className={inp} />
             </Field>
             <Field icon={Users} label="Party size">
-              <input data-testid="preauth-size" type="number" min="1" value={size}
-                onChange={(e) => setSize(e.target.value)} className={inp} />
+              <input data-testid="preauth-size" type="number" min="1" value={f.size}
+                onChange={(e) => f.setSize(e.target.value)} className={inp} />
             </Field>
           </div>
-          <div className="p-2.5 rounded-lg bg-[var(--cyan)]/10 border border-[var(--cyan)]/30 text-[10px] font-mono text-[var(--cyan)] leading-relaxed">
-            {stripeReady ? (
-              <>Stripe SetupIntent <span className="font-black">{stripeInfo?.setup_intent_id?.slice(0, 12)}…</span> created ✓ · At last call, auto-close charges the on-file card.</>
-            ) : (
-              <>Click <span className="font-black">Create Card Hold</span> to reserve a real Stripe SetupIntent (test-mode) — or open the tab with the last-4 only.</>
-            )}
-          </div>
+          <StripeHoldStatus ready={f.stripeReady} info={f.stripeInfo} />
         </div>
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">Cancel</button>
-          <button data-testid="preauth-stripe" onClick={createStripeHold} disabled={busy || !name.trim() || stripeReady}
+          <button data-testid="preauth-stripe" onClick={f.createStripeHold} disabled={f.busy || !f.name.trim() || f.stripeReady}
             className="flex-1 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--cyan)] text-[var(--cyan)] disabled:opacity-40">
-            {stripeReady ? "Hold Created ✓" : (busy ? "Creating…" : "Create Card Hold")}
+            {f.stripeReady ? "Hold Created ✓" : (f.busy ? "Creating…" : "Create Card Hold")}
           </button>
-          <button data-testid="preauth-open" onClick={submit} disabled={!canOpen || busy}
+          <button data-testid="preauth-open" onClick={f.submit} disabled={!f.canOpen || f.busy}
             className="flex-1 btn-neon py-2.5 rounded-lg disabled:opacity-40">
-            {busy ? "Opening…" : "Open Tab"}
+            {f.busy ? "Opening…" : "Open Tab"}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StripeHoldStatus({ ready, info }) {
+  return (
+    <div className="p-2.5 rounded-lg bg-[var(--cyan)]/10 border border-[var(--cyan)]/30 text-[10px] font-mono text-[var(--cyan)] leading-relaxed">
+      {ready ? (
+        <>Stripe SetupIntent <span className="font-black">{info?.setup_intent_id?.slice(0, 12)}…</span> created ✓ · At last call, auto-close charges the on-file card.</>
+      ) : (
+        <>Click <span className="font-black">Create Card Hold</span> to reserve a real Stripe SetupIntent (test-mode) — or open the tab with the last-4 only.</>
+      )}
     </div>
   );
 }

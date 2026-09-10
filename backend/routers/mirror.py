@@ -26,8 +26,8 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
-async def build_payload() -> dict:
-    paid = await db.orders.find({"status": "paid"}).to_list(5000)
+def _sales_summary(paid: list) -> dict:
+    """Aggregate paid orders into the mirror's sales block."""
     by_hour: dict = {}
     by_pay: dict = {}
     for o in paid:
@@ -38,39 +38,50 @@ async def build_payload() -> dict:
         by_hour[h] = round(by_hour.get(h, 0) + o.get("total", 0), 2)
         m = (o.get("payment") or {}).get("method", "cash")
         by_pay[m] = round(by_pay.get(m, 0) + o.get("total", 0), 2)
-    ingredients = sl(await db.ingredients.find().to_list(500))
-    low = [i for i in ingredients if i["qty"] <= i.get("par_level", 0)]
-    usage_rows = await db.inv_movements.find({"type": "sale"}).to_list(10000)
+    return {
+        "total_revenue": round(sum(o.get("total", 0) for o in paid), 2),
+        "paid_orders": len(paid),
+        "by_hour": [{"hour": h, "revenue": v} for h, v in sorted(by_hour.items())],
+        "by_payment": [{"method": k, "amount": v} for k, v in by_pay.items()],
+    }
+
+
+async def _usage_summary() -> list:
+    rows = await db.inv_movements.find({"type": "sale"}).to_list(10000)
     usage: dict = {}
-    for r in usage_rows:
+    for r in rows:
         usage[r["name"]] = round(usage.get(r["name"], 0) - r["delta"], 3)
-    # Pre-shift briefing + owner alerts (read-only aggregates)
+    return [{"name": k, "qty": v} for k, v in usage.items()]
+
+
+async def _briefing(low: list) -> dict:
+    """Pre-shift briefing: low stock, 86'd items, today's events."""
     eightysixed = [p["name"] async for p in db.products.find({"eightysix": True})]
-    active_hh = []
+    events_today = []
     try:
-        from datetime import datetime as _dt
-        today = _dt.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         async for e in db.events.find({"date": today}):
-            active_hh.append(e.get("name", "event"))
+            events_today.append(e.get("name", "event"))
     except Exception:
         pass
+    return {"low_stock": [i["name"] for i in low], "eightysixed": eightysixed, "events_today": events_today}
+
+
+async def build_payload() -> dict:
+    paid = await db.orders.find({"status": "paid"}).to_list(5000)
+    ingredients = sl(await db.ingredients.find().to_list(500))
+    low = [i for i in ingredients if i["qty"] <= i.get("par_level", 0)]
     unacked = await db.alerts.find({"ack": False}).sort("ts", -1).to_list(20)
-    payload = {
+    return {
         "venue_id": "hk-bar-001",
         "ts": _now(),
-        "sales": {
-            "total_revenue": round(sum(o.get("total", 0) for o in paid), 2),
-            "paid_orders": len(paid),
-            "by_hour": [{"hour": h, "revenue": v} for h, v in sorted(by_hour.items())],
-            "by_payment": [{"method": k, "amount": v} for k, v in by_pay.items()],
-        },
+        "sales": _sales_summary(paid),
         "inventory": [{"name": i["name"], "qty": i["qty"], "unit": i["unit"], "par_level": i.get("par_level", 0)} for i in ingredients],
         "low_stock": [i["name"] for i in low],
-        "usage": [{"name": k, "qty": v} for k, v in usage.items()],
-        "briefing": {"low_stock": [i["name"] for i in low], "eightysixed": eightysixed, "events_today": active_hh},
+        "usage": await _usage_summary(),
+        "briefing": await _briefing(low),
         "alerts": [{"kind": a.get("kind"), "message": a.get("message"), "ts": a.get("ts")} for a in unacked],
     }
-    return payload
 
 
 async def push_to_cloud() -> dict:
