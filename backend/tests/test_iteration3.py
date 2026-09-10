@@ -22,12 +22,12 @@ def admin_h():
 
 @pytest.fixture(scope="session")
 def server_h():
-    return {"Authorization": f"Bearer {_login('server@hkbar.com', 'server123')}"}
+    return {"Authorization": f"Bearer {_login('john@belly.com', 'belly123')}"}
 
 
 @pytest.fixture(scope="session")
 def manager_h():
-    return {"Authorization": f"Bearer {_login('manager@hkbar.com', 'manager123')}"}
+    return {"Authorization": f"Bearer {_login('cindy@belly.com', 'belly123')}"}
 
 
 # ---------- helpers ----------
@@ -149,7 +149,7 @@ class TestShifts:
         # cleanup
         requests.post(f"{BASE_URL}/api/shifts/clock-out", headers=server_h)
 
-    def test_current_reflects_paid_order(self, server_h):
+    def test_current_reflects_paid_order(self, server_h, manager_h):
         # Clean + clock in fresh
         requests.post(f"{BASE_URL}/api/shifts/clock-out", headers=server_h)
         ci = requests.post(f"{BASE_URL}/api/shifts/clock-in", headers=server_h)
@@ -173,8 +173,8 @@ class TestShifts:
         o = r.json()
         assert o.get("server_id"), "server_id auto-set"
 
-        # Pay it (cash, with tip)
-        pr = requests.post(f"{BASE_URL}/api/orders/{o['id']}/pay", headers=server_h, json={
+        # Pay it (cash, with tip) — FOH cannot take payments by design; manager settles
+        pr = requests.post(f"{BASE_URL}/api/orders/{o['id']}/pay", headers=manager_h, json={
             "method": "cash", "amount": o["total"] + 10, "tip": 10, "splits": [],
         })
         assert pr.status_code == 200

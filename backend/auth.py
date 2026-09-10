@@ -79,7 +79,7 @@ def make_current_user_dep(get_db):
 
 def require_role(*allowed: str):
     def _wrap(user: dict):
-        if user.get("role") not in allowed and user.get("role") != "admin":
+        if user.get("role") not in allowed and user.get("role") not in ("admin", "owner"):
             raise HTTPException(status_code=403, detail="Insufficient permission")
         return user
     return _wrap

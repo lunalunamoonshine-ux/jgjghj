@@ -11,7 +11,7 @@ export default function Printers() {
   const [jobs, setJobs] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const { user } = useAuth();
-  const mgr = ["admin", "manager"].includes(user?.role);
+  const mgr = ["owner", "admin", "manager", "assistant_manager"].includes(user?.role);
 
   const load = useCallback(async () => {
     const [p, j, a] = await Promise.all([api.get("/printers"), api.get("/print-jobs"), api.get("/alerts")]);

@@ -16,7 +16,7 @@ class LoginIn(BaseModel):
 
 
 class PinLoginIn(BaseModel):
-    pin: str = Field(min_length=4, max_length=6)
+    pin: str = Field(min_length=3, max_length=6)
 
 
 class UserOut(BaseModel):
@@ -163,7 +163,7 @@ class StaffIn(BaseModel):
     email: EmailStr
     password: str
     name: str
-    role: Literal["admin", "manager", "bartender", "server", "cashier"]
+    role: Literal["owner", "admin", "manager", "assistant_manager", "cashier", "front_of_house", "kitchen"]
     pin: str = Field(min_length=4, max_length=6)
 
 

@@ -234,5 +234,5 @@ def test_order_lifecycle_split_payment(s):
 
 
 def test_pin_login(s):
-    r = s.post(f"{API}/auth/pin-login", json={"pin": "1111"})
+    r = s.post(f"{API}/auth/pin-login", json={"pin": "111"})
     assert r.status_code == 200, r.text

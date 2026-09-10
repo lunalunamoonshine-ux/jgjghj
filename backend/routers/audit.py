@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from deps import db, sl
+from deps import db, sl, MANAGER_ROLES
 from auth import make_current_user_dep
 
 get_current_user = make_current_user_dep(lambda: db)
@@ -35,7 +35,7 @@ async def audit_event(kind: str, payload: dict, actor: str):
 
 @router.get("/audit")
 async def list_audit(limit: int = 200, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     return sl(await db.audit_log.find().sort("seq", -1).to_list(limit))
 
@@ -43,7 +43,7 @@ async def list_audit(limit: int = 200, user: dict = Depends(get_current_user)):
 @router.get("/audit/verify")
 async def verify_audit(user: dict = Depends(get_current_user)):
     """Walk the whole chain and recompute every hash."""
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     entries = await db.audit_log.find().sort("seq", 1).to_list(100000)
     prev = "GENESIS"

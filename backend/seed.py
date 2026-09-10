@@ -193,12 +193,22 @@ async def _seed_users(db):
     admin_pass = os.environ.get("ADMIN_PASSWORD", "admin123")
     admin_pin = os.environ.get("ADMIN_PIN", "9999")
 
+    # Retire demo staff — real roster below
+    await db.users.update_many(
+        {"email": {"$in": ["manager@hkbar.com", "bartender@hkbar.com", "server@hkbar.com", "cashier@hkbar.com"]}},
+        {"$set": {"active": False}},
+    )
     users = [
-        (admin_email, admin_pass, "Owner", "admin", admin_pin, 0.0),
-        ("manager@hkbar.com", "manager123", "Alex Chan", "manager", "1111", 90.0),
-        ("bartender@hkbar.com", "bartender123", "Mei Wong", "bartender", "2222", 75.0),
-        ("server@hkbar.com", "server123", "Ravi Kumar", "server", "3333", 65.0),
-        ("cashier@hkbar.com", "cashier123", "Ivy Lo", "cashier", "4444", 65.0),
+        (admin_email, admin_pass, "Owner", "owner", admin_pin, 0.0),
+        ("steph@belly.com", "Steph", "Steph", "owner", "666", 0.0),
+        ("mandy@belly.com", "Mandy", "Mandy", "owner", "888", 0.0),
+        ("admin@belly.com", "BellyBeer21", "Belly Admin", "admin", "0000", 0.0),
+        ("cindy@belly.com", "belly123", "Cindy", "manager", "111", 90.0),
+        ("mavis@belly.com", "belly123", "Mavis", "assistant_manager", "222", 80.0),
+        ("shrey@belly.com", "belly123", "Shrey", "assistant_manager", "333", 80.0),
+        ("kat@belly.com", "belly123", "Kat", "assistant_manager", "555", 80.0),
+        ("john@belly.com", "belly123", "John", "front_of_house", "777", 65.0),
+        ("ayi@belly.com", "belly123", "Ayi", "kitchen", "999", 65.0),
     ]
     for email, pwd, name, role, pin, rate in users:
         existing = await db.users.find_one({"email": email})

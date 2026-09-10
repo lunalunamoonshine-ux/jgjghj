@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import requests
 from fastapi import APIRouter, Depends, HTTPException
 
-from deps import db, sl
+from deps import db, sl, MANAGER_ROLES
 from auth import make_current_user_dep
 
 get_current_user = make_current_user_dep(lambda: db)
@@ -99,7 +99,7 @@ async def push_to_cloud() -> dict:
 
 @router.post("/sync")
 async def sync_now(user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     try:
         return await push_to_cloud()

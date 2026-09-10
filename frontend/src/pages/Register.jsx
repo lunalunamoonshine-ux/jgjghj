@@ -230,7 +230,7 @@ export default function Register() {
           setOrder(upd.data);
         } catch (e) { toast.error(errMsg(e, "Void failed")); }
       };
-      const isManager = user?.role === "admin" || user?.role === "manager";
+      const isManager = ["owner", "admin", "manager", "assistant_manager"].includes(user?.role);
       if (isManager) { doVoid(undefined); return; }
       setPinGate({ action: `void "${line?.name}"`, onOk: (mgr, pin) => doVoid(pin) });
       return;

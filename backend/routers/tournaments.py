@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from deps import db, _oid, serialize, sl
+from deps import db, _oid, serialize, sl, MANAGER_ROLES
 from auth import make_current_user_dep
 from routers.audit import audit_event
 
@@ -78,7 +78,7 @@ async def add_player(tid: str, body: dict, user: dict = Depends(get_current_user
 
 @router.delete("/tournaments/{tid}/players/{pid}")
 async def remove_player(tid: str, pid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     await db.tournament_players.delete_one({"_id": _oid(pid), "tournament_id": tid})
     return {"ok": True}
@@ -109,7 +109,7 @@ async def collect_entry(tid: str, body: dict, user: dict = Depends(get_current_u
 @router.post("/tournaments/{tid}/payouts")
 async def record_payout(tid: str, body: dict, user: dict = Depends(get_current_user)):
     """Record a prize payout. Guarded: total payouts may not exceed collected pool."""
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     t = await db.tournaments.find_one({"_id": _oid(tid)})
     if not t:
@@ -131,7 +131,7 @@ async def record_payout(tid: str, body: dict, user: dict = Depends(get_current_u
 
 @router.post("/tournaments/{tid}/close")
 async def close_tournament(tid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     await db.tournaments.update_one({"_id": _oid(tid)}, {"$set": {"status": "closed", "closed_at": _now()}})
     return await get_tournament(tid, user)

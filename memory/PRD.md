@@ -3,11 +3,14 @@
 ## Original problem statement
 Brownfield hardening of an existing HK bar POS (React CRA + FastAPI + MongoDB, repo: bellybeeroperations-png/posrepotry). Live POS runs on-prem LAN only; owner gets a read-only cloud reporting mirror (push-only, no inbound hole). Gap backlog: printer routing, ingredient inventory, card terminal, split/merge, clock-in/HR, cloud mirror, deployment cleanup. Later extended with floorplan upgrades, ops rituals, QR self-ordering, darts ledger, and audit chain.
 
-## User personas
-- **Owner** (lunalunamoonshine@gmail.com / PIN 9999): full access, remote read-only reports via cloud mirror
-- **Manager** (manager@hkbar.com / PIN 1111): approvals, menu/printer/inventory admin
-- **Bartender/Server/Cashier** (PINs 2222/3333/4444): register, KDS, tables
+## User personas (role hierarchy, server-enforced)
+- **Owner (godmode)**: Steph (666), Mandy (888), platform owner lunalunamoonshine@gmail.com (9999) — everything incl. financial-record deletes (audit-chained)
+- **Admin / Manager / Asst Manager**: admin@belly.com (0000), Cindy (111), Mavis (222), Shrey (333), Kat (555) — all read/write EXCEPT deleting financial records (403)
+- **Cashier**: payments, open/close orders, members/loyalty, discounts (no account assigned yet)
+- **Front of House**: John (777) — orders (no payments), tables, waitlist, reservations, members, KDS bump
+- **Kitchen & Maintenance**: Ayi (999) — KDS bump, 86 board, inventory restock/wastage
 - **Guest**: QR menu at `/m/{tableId}`, no auth, order + FPS pay-at-seat
+- Enforcement: `role_write_guard` middleware (write allowlists per restricted role) + `MANAGER_ROLES`/`require_manager`/`require_owner` in deps.py; demo staff deactivated
 
 ## Architecture
 - Backend: FastAPI modular routers (orders, tables, kegs, printers, inventory, mirror, audit, tournaments) + server.py core (auth, shifts, CRM, public QR)

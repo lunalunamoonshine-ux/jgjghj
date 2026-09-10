@@ -43,7 +43,7 @@ export default function Login() {
 
   const tapKey = (k) => {
     if (k === "back") return setPin((p) => p.slice(0, -1));
-    if (k === "enter") return pin.length >= 4 && doPin(pin);
+    if (k === "enter") return pin.length >= 3 && doPin(pin);
     setPin((p) => {
       const np = (p + k).slice(0, 6);
       if (np.length === 4) doPin(np);

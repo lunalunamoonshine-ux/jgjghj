@@ -31,8 +31,9 @@ from routers.orders import router as orders_router
 from routers.printers import router as printers_router
 from routers.inventory import router as inventory_router
 from routers.mirror import router as mirror_router, sync_loop
-from routers.audit import router as audit_router
+from routers.audit import router as audit_router, audit_event
 from routers.tournaments import router as tournaments_router
+from deps import MANAGER_ROLES, KITCHEN_ROLES, require_manager, require_owner
 
 # ----- DB -----
 mongo_url = os.environ["MONGO_URL"]
@@ -40,6 +41,44 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
 app = FastAPI(title="HK Bar POS")
+
+# ---- Role-based write guards (backend-enforced; frontend gating is cosmetic) ----
+import jwt as _jwt
+from fastapi.responses import JSONResponse as _JSONResponse
+
+_ROLE_WRITE_ALLOW = {
+    "kitchen": ("/api/kds", "/api/auth", "/api/shifts"),
+    "cashier": ("/api/orders", "/api/members", "/api/payments", "/api/auth", "/api/shifts", "/api/tabs"),
+    "front_of_house": ("/api/orders", "/api/tables", "/api/waitlist", "/api/reservations", "/api/members", "/api/kds", "/api/auth", "/api/shifts"),
+}
+
+
+@app.middleware("http")
+async def role_write_guard(request, call_next):
+    if request.method in ("POST", "PATCH", "PUT", "DELETE"):
+        token = request.cookies.get("access_token")
+        _auth = request.headers.get("Authorization", "")
+        if not token and _auth.startswith("Bearer "):
+            token = _auth[7:]
+        payload = None
+        if token:
+            try:
+                payload = _jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"])
+            except Exception:
+                payload = None
+        role = (payload or {}).get("role")
+        if role in _ROLE_WRITE_ALLOW:
+            path = request.url.path
+            allowed = any(path.startswith(pfx) for pfx in _ROLE_WRITE_ALLOW[role])
+            if role == "kitchen":
+                allowed = allowed or path.endswith("/eightysix") or path.endswith("/restock") or path.endswith("/wastage") or "/bump/" in path
+            if role in ("front_of_house", "kitchen") and (path.endswith("/pay") or "/payments/" in path):
+                allowed = False
+            if not allowed:
+                return _JSONResponse({"detail": f"Role '{role}' cannot write to {path}"}, status_code=403)
+    return await call_next(request)
+
+
 api = APIRouter(prefix="/api")
 
 get_current_user = make_current_user_dep(lambda: db)
@@ -177,6 +216,8 @@ async def update_product(pid: str, body: ProductIn, user: dict = Depends(get_cur
 
 @api.post("/products/{pid}/eightysix")
 async def toggle_eightysix(pid: str, on: bool = True, user: dict = Depends(get_current_user)):
+    if user["role"] not in KITCHEN_ROLES:
+        raise HTTPException(403, "No 86 permission")
     """86 (out-of-stock) or un-86 a product. Instantly hides from public QR menu."""
     await db.products.update_one({"_id": _oid(pid)}, {"$set": {"eightysix": bool(on)}})
     return serialize(await db.products.find_one({"_id": _oid(pid)}))
@@ -302,7 +343,10 @@ async def get_member(mid: str, user: dict = Depends(get_current_user)):
 
 @api.delete("/members/{mid}")
 async def delete_member(mid: str, user: dict = Depends(get_current_user)):
+    require_owner(user)  # member records carry points/spend — financial data
+    m = await db.members.find_one({"_id": _oid(mid)})
     await db.members.delete_one({"_id": _oid(mid)})
+    await audit_event("member_delete", {"member": (m or {}).get("name"), "member_id": mid}, user["name"])
     return {"ok": True}
 
 
@@ -320,7 +364,7 @@ async def list_staff(user: dict = Depends(get_current_user)):
 
 @api.post("/staff")
 async def create_staff(body: StaffIn, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     if await db.users.find_one({"email": body.email.lower()}):
         raise HTTPException(400, "Email exists")
@@ -337,9 +381,10 @@ async def create_staff(body: StaffIn, user: dict = Depends(get_current_user)):
 
 @api.delete("/staff/{uid}")
 async def delete_staff(uid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
-        raise HTTPException(403, "Manager only")
+    require_owner(user)  # HR records — Owner only
+    u = await db.users.find_one({"_id": _oid(uid)})
     await db.users.delete_one({"_id": _oid(uid)})
+    await audit_event("staff_delete", {"staff": (u or {}).get("name"), "user_id": uid}, user["name"])
     return {"ok": True}
 
 
@@ -520,7 +565,7 @@ async def shift_current(user: dict = Depends(get_current_user)):
 
 @api.get("/shifts")
 async def list_shifts(user: dict = Depends(get_current_user)):
-    q = {} if user["role"] in ("admin", "manager") else {"user_id": user["id"]}
+    q = {} if user["role"] in MANAGER_ROLES else {"user_id": user["id"]}
     shifts = await db.shifts.find(q).sort("clock_in", -1).to_list(50)
     return [await _shift_stats(s) for s in shifts]
 
@@ -528,7 +573,7 @@ async def list_shifts(user: dict = Depends(get_current_user)):
 @api.get("/shifts/hours")
 async def staff_hours(user: dict = Depends(get_current_user)):
     """Basic HR: per-staff total hours worked + gross pay (hourly_rate on user doc)."""
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     shifts = await db.shifts.find().to_list(5000)
     users = {str(u["_id"]): u for u in await db.users.find().to_list(200)}

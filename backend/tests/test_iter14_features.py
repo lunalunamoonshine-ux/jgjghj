@@ -11,7 +11,7 @@ BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN = {"email": "lunalunamoonshine@gmail.com", "password": "admin123"}
-BAR = {"email": "bartender@hkbar.com", "password": "bartender123"}
+BAR = {"email": "john@belly.com", "password": "belly123"}  # front_of_house — restricted role for 403 tests
 
 
 @pytest.fixture(scope="module")

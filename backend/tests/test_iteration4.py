@@ -51,18 +51,18 @@ class TestPublicMenu:
 class TestPinVerify:
     def test_wrong_pin(self):
         r = requests.post(f"{BASE_URL}/api/auth/pin-verify",
-                          json={"pin": "0000", "required_roles": ["manager", "admin"]})
+                          json={"pin": "9898", "required_roles": ["manager", "admin"]})
         assert r.status_code == 401
 
     def test_valid_pin_wrong_role(self):
         # server PIN 3333, but required_roles excludes server
         r = requests.post(f"{BASE_URL}/api/auth/pin-verify",
-                          json={"pin": "3333", "required_roles": ["manager", "admin"]})
+                          json={"pin": "777", "required_roles": ["manager", "admin"]})
         assert r.status_code == 403
 
     def test_manager_pin_ok(self):
         r = requests.post(f"{BASE_URL}/api/auth/pin-verify",
-                          json={"pin": "1111", "required_roles": ["manager", "admin"]})
+                          json={"pin": "111", "required_roles": ["manager", "admin"]})
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["valid"] == True
@@ -72,7 +72,7 @@ class TestPinVerify:
 
     def test_admin_pin_ok(self):
         r = requests.post(f"{BASE_URL}/api/auth/pin-verify",
-                          json={"pin": "9999", "required_roles": ["manager", "admin"]})
+                          json={"pin": "0000", "required_roles": ["manager", "admin"]})
         assert r.status_code == 200
         assert r.json()["role"] == "admin"
 

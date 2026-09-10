@@ -8,7 +8,7 @@ export default function Tournaments() {
   const [list, setList] = useState([]);
   const [sel, setSel] = useState(null);
   const { user } = useAuth();
-  const mgr = ["admin", "manager"].includes(user?.role);
+  const mgr = ["owner", "admin", "manager", "assistant_manager"].includes(user?.role);
 
   const selId = sel?.id;
   const load = useCallback(async () => {

@@ -70,14 +70,14 @@ class TestAuthPinShift:
         r = requests.post(f"{BASE_URL}/api/auth/login",
                           json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
         assert r.status_code == 200
-        assert r.json()["user"]["role"] == "admin"
+        assert r.json()["user"]["role"] == "owner"
 
     def test_pin_login_auto_shift(self):
-        # Use bartender PIN 2222 to test auto-clock-in without polluting admin
-        r = requests.post(f"{BASE_URL}/api/auth/pin-login", json={"pin": "2222"})
+        # Use assistant-manager PIN 222 to test auto-clock-in without polluting admin
+        r = requests.post(f"{BASE_URL}/api/auth/pin-login", json={"pin": "222"})
         assert r.status_code == 200, r.text
         data = r.json()
-        assert data["user"]["role"] == "bartender"
+        assert data["user"]["role"] == "assistant_manager"
         tok = data["token"]
         s = requests.Session()
         s.headers.update({"Authorization": f"Bearer {tok}"})

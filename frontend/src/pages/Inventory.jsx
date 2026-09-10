@@ -13,7 +13,7 @@ export default function Inventory() {
   const [countResult, setCountResult] = useState(null);
   const [tab, setTab] = useState("stock");
   const { user } = useAuth();
-  const mgr = ["admin", "manager"].includes(user?.role);
+  const mgr = ["owner", "admin", "manager", "assistant_manager"].includes(user?.role);
 
   const load = useCallback(async () => {
     const [i, m, u, b] = await Promise.all([

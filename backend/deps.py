@@ -34,3 +34,18 @@ def sl(docs: list) -> list:
 
 def now_iso() -> str:
     return datetime.now(HK_TZ).isoformat()
+
+
+# ---- Role hierarchy: owner (godmode) > admin = manager = assistant_manager > cashier / front_of_house / kitchen ----
+MANAGER_ROLES = ("owner", "admin", "manager", "assistant_manager")
+KITCHEN_ROLES = MANAGER_ROLES + ("kitchen",)
+
+
+def require_manager(user: dict):
+    if user.get("role") not in MANAGER_ROLES:
+        raise HTTPException(403, "Manager role required")
+
+
+def require_owner(user: dict):
+    if user.get("role") != "owner":
+        raise HTTPException(403, "Owner only")

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from deps import db, _oid, serialize, sl
+from deps import db, _oid, serialize, sl, MANAGER_ROLES
 from auth import make_current_user_dep
 
 get_current_user = make_current_user_dep(lambda: db)
@@ -119,7 +119,7 @@ async def list_printers(user: dict = Depends(get_current_user)):
 
 @router.post("/printers")
 async def create_printer(body: PrinterIn, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     doc = body.model_dump()
     doc["created_at"] = _now()
@@ -129,7 +129,7 @@ async def create_printer(body: PrinterIn, user: dict = Depends(get_current_user)
 
 @router.patch("/printers/{pid}")
 async def update_printer(pid: str, body: dict, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     upd = {k: v for k, v in body.items() if k in ("name", "ip", "port", "role", "online", "active")}
     await db.printers.update_one({"_id": _oid(pid)}, {"$set": upd})
@@ -138,7 +138,7 @@ async def update_printer(pid: str, body: dict, user: dict = Depends(get_current_
 
 @router.delete("/printers/{pid}")
 async def delete_printer(pid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     await db.printers.delete_one({"_id": _oid(pid)})
     return {"ok": True}

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from deps import db, _oid, serialize, sl
+from deps import db, _oid, serialize, sl, MANAGER_ROLES
 from auth import make_current_user_dep
 
 get_current_user = make_current_user_dep(lambda: db)
@@ -94,7 +94,7 @@ async def list_ingredients(user: dict = Depends(get_current_user)):
 
 @router.post("/ingredients")
 async def create_ingredient(body: IngredientIn, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     doc = body.model_dump()
     doc["created_at"] = _now()
@@ -104,7 +104,7 @@ async def create_ingredient(body: IngredientIn, user: dict = Depends(get_current
 
 @router.patch("/ingredients/{iid}")
 async def update_ingredient(iid: str, body: dict, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     upd = {k: v for k, v in body.items() if k in ("name", "unit", "par_level", "cost_per_unit")}
     await db.ingredients.update_one({"_id": _oid(iid)}, {"$set": upd})
@@ -113,7 +113,7 @@ async def update_ingredient(iid: str, body: dict, user: dict = Depends(get_curre
 
 @router.delete("/ingredients/{iid}")
 async def delete_ingredient(iid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager only")
     await db.ingredients.delete_one({"_id": _oid(iid)})
     return {"ok": True}

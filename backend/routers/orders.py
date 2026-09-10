@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from deps import db, _oid, serialize, sl
+from deps import db, _oid, serialize, sl, MANAGER_ROLES, require_owner
 from auth import make_current_user_dep
 from models import OrderIn, OrderUpdate, PaymentIn, AutoCloseIn, MoveLineIn, MergeOrdersIn, PreauthTabIn, DeliveryIngestIn, SetupIntentIn, PreauthCompleteIn, UpsellNudgeIn
 from routers.kegs import decrement_kegs_for_order
@@ -351,12 +351,12 @@ async def pay_order(oid: str, body: PaymentIn, user: dict = Depends(get_current_
 
 @router.delete("/orders/{oid}")
 async def void_order(oid: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ("admin", "manager"):
-        raise HTTPException(403, "Manager override required to void")
+    require_owner(user)  # voiding an order erases a financial record — Owner only
     o = await db.orders.find_one({"_id": _oid(oid)})
     if not o:
         raise HTTPException(404, "Not found")
     await db.orders.update_one({"_id": _oid(oid)}, {"$set": {"status": "voided"}})
+    await audit_event("order_void", {"order_id": oid, "total": o.get("total", 0)}, user["name"])
     if o.get("table_id"):
         await db.tables.update_one(
             {"_id": _oid(o["table_id"])},
@@ -384,7 +384,7 @@ async def bump_line(oid: str, index: int, user: dict = Depends(get_current_user)
 async def auto_close_tabs(body: AutoCloseIn, user: dict = Depends(get_current_user)):
     """Batch-settle every open tab at last call. Used at 03:00 HK / closing time.
     Manager/admin only. Records payment.method=body.method + note; frees tables."""
-    if user["role"] not in ("admin", "manager"):
+    if user["role"] not in MANAGER_ROLES:
         raise HTTPException(403, "Manager override required")
     orders = await db.orders.find({"status": "open"}).to_list(1000)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -808,8 +808,8 @@ async def void_line(oid: str, body: dict, user: dict = Depends(get_current_user)
     if not o or o.get("status") == "paid":
         raise HTTPException(400, "Cannot void on this order")
     manager = user
-    if user["role"] not in ("admin", "manager"):
-        mgr = await db.users.find_one({"pin": body.get("manager_pin", ""), "role": {"$in": ["admin", "manager"]}, "active": True})
+    if user["role"] not in MANAGER_ROLES:
+        mgr = await db.users.find_one({"pin": body.get("manager_pin", ""), "role": {"$in": list(MANAGER_ROLES)}, "active": True})
         if not mgr:
             raise HTTPException(403, "Manager PIN required")
         manager = {"id": str(mgr["_id"]), "name": mgr["name"], "role": mgr["role"]}
